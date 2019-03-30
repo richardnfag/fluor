@@ -1,4 +1,3 @@
-use crate::router::Router;
 use std::fs::{remove_file, File};
 use std::io::prelude::Write;
 use std::path::Path;
@@ -12,6 +11,7 @@ use hyper::{Body, Response};
 
 use hyper::http::request::Parts;
 
+use crate::router::Router;
 use crate::trigger::Trigger;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -35,17 +35,15 @@ impl Function {
         Trigger::new(self.method.as_str(), self.path.as_str())
     }
 
-    pub fn build(self) -> Option<Function> {
+    pub fn build(self) -> Result<Function, &'static str> {
         match File::create(&Path::new(&"data/source.tar.gz"))
             .map(|mut f| decode(self.source.as_str()).map(|s| f.write_all(s.as_slice())))
         {
             Ok(Err(_)) => {
-                eprintln!("Error: Could not decode file");
-                return None;
+                return Err("Error: Could not decode file");
             }
             Err(_) => {
-                eprintln!("Error: Could not create file");
-                return None;
+                return Err("Error: Could not create file");
             }
             _ => {}
         };
@@ -61,12 +59,12 @@ impl Function {
             .expect("Failed to execute: docker build")
             .success()
         {
-            return None;
+            return Err("Failed to execute: docker build");
         }
 
         remove_file("data/source.tar.gz").ok();
 
-        Some(self)
+        Ok(self)
     }
 
     pub fn run(&self, _headers: Parts, body: Body) -> Response<Body> {

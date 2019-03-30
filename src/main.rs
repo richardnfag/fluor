@@ -41,8 +41,9 @@ fn nanoservices(
             let router = router.clone();
             Box::new(req.into_body().concat2().map(move |b| {
                 let f = match Function::from_json(&b.into_bytes()).map(|f| f.build()) {
-                    Some(Some(f)) => f,
-                    Some(None) => {
+                    Some(Ok(f)) => f,
+                    Some(Err(e)) => {
+                        eprintln!("{}", e);
                         return Response::builder()
                             .status(422)
                             .body("Failed build process".into())
