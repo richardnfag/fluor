@@ -1,8 +1,9 @@
 FROM rust:latest AS builder
 
 WORKDIR /usr/src/function/
-ADD source.tar.gz /usr/src/function/
+
 RUN rustup target add x86_64-unknown-linux-musl
+ADD source.tar.gz /usr/src/function/
 RUN cargo build --release --target x86_64-unknown-linux-musl
 
 RUN NAME=$(awk '/name/ {print $3}' Cargo.toml | sed 's/[[:punct:]]//g') && \
