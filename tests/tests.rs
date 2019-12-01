@@ -1,56 +1,106 @@
-extern crate fluor;
-
-use fluor::function::Function;
-use futures::{Future, Stream};
-use hyper::Request;
-
-use std::fs::create_dir_all;
-use std::path::Path;
-
-static FUNCTION : &'static [u8] = br#"{
-    "name": "hello-rust",
-    "language": "rust",
-    "source": "H4sIANNokVwAA+2VTUvEMBCGe86vmM1pF6QmadoKfiAI4smD12WR0MZu2DZZklQP4n83xbLIgu7Froh5LhMmHzOZl0mcrU6TiSGElGUOwdIyJ6Olg90BNOOcs4KzMCaUlZwmkE+d2EDvvLAhFauqtbD1l+sOzY/32Nk/ggv6d0Lp1LrJYoR6FAX/Rv8839OfsyxLgEyW0Sf+uf5PGgb55wt4RRDYWqV9q2dzfCfb1pzAi7FtPcOLc/SGfjvZyI9zI2xjUm+6droYh/qfsWy//8OHEfv/GCy3otqIRq6QFp2ES8Droe8xepbWKaMHD0lpSjASvV8b64JniR8+qgG1gXvhKtVJ7Q3ciqbXtXRwMVZLC/d4bXrfGrNJK9Nd4RWStfLjwYzQM4zQspZbGfbpSkm3iq9MJBKJHIN3ylDQlgAOAAA",
-    "method": "GET",
-    "path": "/hello-rust/",
-    "cpu": "2",
-    "memory": "1024m",
-    "uptime": "30"
-}"#;
+use futures_util::TryStreamExt;
+use hyper::{Body, Client, Request};
+use tokio::runtime::Runtime;
 
 #[test]
-fn create_function() {
-    let f = Function::from_json(FUNCTION);
-    assert_eq!(f.is_some(), true);
+fn function() {
+    let rt = Runtime::new().unwrap();
+
+    rt.block_on(create_function());
+    rt.block_on(run_function());
+    rt.block_on(delete_function());
 }
 
-#[test]
-fn build_function() {
-    create_dir_all(Path::new("data/")).unwrap();
-    let f = Function::from_json(FUNCTION).unwrap().build();
-    assert_eq!(f.is_ok(), true);
-}
+async fn create_function() {
+    let body = r#"{
+        "name": "hello",
+        "language": "rust",
+        "source": "H4sIAAAAAAAAA+3VTUvDMBgH8J7zKbKcNpAu6avgC4Ignjx4HUNCm21hbTKS1ov43W3dhCHoQOiG7P+7BJK0ecgfnoTTYHC8k+dpP4o85fvjl0DEaRbzhCd5FnAheJwHNB2+tCBofSMdpYHTxUq68sd9h9b/qXB6L93Sho2tq6HO6APOsuTH/KMo/pZ/lHfbKR+qoH1nnv9sI4u1XKo5MbJW9Iaylaoqy8ircl5b08/wUIScEdk2K+t8NzNjz9vboKWlT9IXulamsfRBLltTKk+vd7dlpH+5s21TWbsOC1vfsjlRpW52P464uGSEzEq1Ud13ptDKz8mpr+SshFPvioHfgD/0/yzK0P+PYZt/LbUJnR/ojEP9n6fiM/80E0ke9fnHonsS0P+PYGFoH/54Qt8I7WycNk1lRmP2qC/oomqtG7HJFXk/daEAAAAAAAAAAAAAAAAAAPCrD2TfwBsAKAAA",
+        "method": "GET",
+        "path": "/hello/",
+        "cpu": "2",
+        "memory": "1024m",
+        "uptime": "30"
+    }"#;
 
-#[test]
-fn run_function() {
-    let f = Function::from_json(FUNCTION).unwrap().build().unwrap();
+    let client = Client::new();
 
-    let request = Request::builder()
-        .method("GET")
-        .uri("https://localhost:8000")
-        .body("".into())
-        .unwrap();
+    let req = Request::builder()
+        .method("POST")
+        .uri("http://127.0.0.1:8000/function/")
+        .body(Body::from(body))
+        .expect("request builder");
 
-    let (parts, body) = request.into_parts();
-
-    let res = f.run(parts, body);
-
-    let res = res
+    let res = client
+        .request(req)
+        .await
+        .unwrap()
         .into_body()
-        .concat2()
-        .wait()
-        .ok()
-        .map(|b| b.into_bytes());
+        .try_concat()
+        .await
+        .expect("request body concat")
+        .into_bytes();
 
-    assert_eq!(&res.unwrap()[..], b"Hello, world!\n");
+    assert_eq!(
+        String::from_utf8_lossy(&res),
+        String::from("Function Created")
+    );
+}
+
+async fn run_function() {
+    let client = Client::new();
+
+    let req = Request::builder()
+        .method("GET")
+        .uri("http://127.0.0.1:8000/hello/")
+        .body(Body::from(""))
+        .expect("request builder");
+
+    let res = client
+        .request(req)
+        .await
+        .unwrap()
+        .into_body()
+        .try_concat()
+        .await
+        .expect("request body concat")
+        .into_bytes();
+
+    assert_eq!(String::from_utf8_lossy(&res), String::from("Hello World!\n"));
+}
+
+async fn delete_function() {
+    let body = r#"{
+        "name": "hello",
+        "language": "rust",
+        "source": "",
+        "method": "GET",
+        "path": "/hello/",
+        "cpu": "2",
+        "memory": "1024m",
+        "uptime": "30"
+    }"#;
+
+    let client = Client::new();
+
+    let req = Request::builder()
+        .method("DELETE")
+        .uri("http://127.0.0.1:8000/function/")
+        .body(Body::from(body))
+        .expect("request builder");
+
+    let res = client
+        .request(req)
+        .await
+        .unwrap()
+        .into_body()
+        .try_concat()
+        .await
+        .expect("request body concat")
+        .into_bytes();
+
+    assert_eq!(
+        String::from_utf8_lossy(&res),
+        String::from("Function Deleted")
+    );
 }

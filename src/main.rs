@@ -1,114 +1,108 @@
 #![deny(warnings)]
 
-pub mod function;
-pub mod router;
-pub mod trigger;
+mod function;
+mod router;
+mod trigger;
+
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Error, Method, Request, Response, Server};
 
 use function::Function;
 use router::Router;
 use trigger::Trigger;
 
-use futures::{future, Future, Stream};
-
-use hyper::service::service_fn;
-use hyper::{Body, Method, Request, Response, Server};
+use futures_util::TryStreamExt;
 
 use std::fs::create_dir_all;
 use std::path::Path;
 
-fn nanoservices(
-    req: Request<Body>,
-    router: &Router,
-) -> Box<Future<Item = Response<Body>, Error = hyper::Error> + Send> {
-    match (req.method(), req.uri().path()) {
-        (&Method::GET, "/function/") => {
-            let mut body = String::from("<h1>Functions</h1>");
+#[tokio::main]
+async fn main() {
+    create_dir_all(Path::new("data/")).unwrap();
 
-            router.select().into_iter().for_each(|v| {
-                body += format!("<a href=\"{}\">{}</a><br>", v.1.path(), v.1.name()).as_str()
-            });
+    let addr = ([127, 0, 0, 1], 8000).into();
 
-            Box::new(future::ok(
-                Response::builder()
-                    .status(200)
-                    .header("Content-type", "text/html; charset=utf-8")
-                    .body(Body::from(body))
-                    .unwrap(),
-            ))
-        }
+    let router = Router::new();
 
-        (&Method::POST, "/function/") => {
-            let router = router.clone();
-            Box::new(req.into_body().concat2().map(move |b| {
-                let f = match Function::from_json(&b.into_bytes()).map(|f| f.build()) {
-                    Some(Ok(f)) => f,
-                    Some(Err(e)) => {
-                        eprintln!("{}", e);
-                        return Response::builder()
-                            .status(422)
-                            .body("Failed build process".into())
-                            .unwrap();
-                    }
-                    None => {
-                        return Response::builder()
-                            .status(422)
-                            .body("JSON error".into())
-                            .unwrap();
-                    }
-                };
+    let make_service = make_service_fn(move |_| {
+        let router = router.clone();
 
-                router.insert(f.trigger(), f);
+        async move {
+            Ok::<_, Error>(service_fn(move |req: Request<Body>| {
+                let router = router.clone();
 
-                Response::new("Function Created".into())
-            }))
-        }
+                async move {
+                    Ok::<_, Error>(match (req.method(), req.uri().path()) {
+                        (&Method::GET, "/function/") => {
+                            let mut body = String::from("<h1>Functions</h1>");
 
-        (&Method::DELETE, "/function/") => {
-            let router = router.clone();
-            Box::new(req.into_body().concat2().map(move |b| {
-                match Function::from_json(&b.into_bytes()) {
-                    Some(f) => f.delete(router),
-                    None => {
-                        return Response::builder()
-                            .status(422)
-                            .body("JSON error".into())
-                            .unwrap();
-                    }
+                            router.select().into_iter().for_each(|v| {
+                                body += format!("<a href=\"{}\">{}</a><br>", v.1.path(), v.1.name())
+                                    .as_str()
+                            });
+
+                            Response::builder()
+                                .status(200)
+                                .header("Content-type", "text/html; charset=utf-8")
+                                .body(body.into())
+                                .unwrap()
+                        }
+                        (&Method::POST, "/function/") => {
+                            let b = req.into_body().try_concat().await.unwrap().into_bytes();
+
+                            match Function::from_json(&b).map(|f| f.build()) {
+                                Some(Ok(f)) => {
+                                    router.insert(f.trigger(), f);
+                                    Response::new("Function Created".into())
+                                }
+                                Some(Err(e)) => {
+                                    eprintln!("{}", e);
+                                    Response::builder()
+                                        .status(422)
+                                        .body("Failed build process".into())
+                                        .unwrap()
+                                }
+                                None => Response::builder()
+                                    .status(422)
+                                    .body("JSON error".into())
+                                    .unwrap(),
+                            }
+                        }
+
+                        (&Method::DELETE, "/function/") => {
+                            let b = req.into_body().try_concat().await.unwrap().into_bytes();
+
+                            match Function::from_json(&b) {
+                                Some(f) => f.delete(router),
+                                None => Response::builder()
+                                    .status(422)
+                                    .body("JSON error".into())
+                                    .unwrap(),
+                            }
+                        }
+
+                        (_, _) => {
+                            let (parts, body) = req.into_parts();
+
+                            match router.get(&Trigger::new(parts.method.as_str(), parts.uri.path()))
+                            {
+                                Some(f) => f.run(parts, body),
+                                None => {
+                                    Response::builder().status(404).body(Body::empty()).unwrap()
+                                }
+                            }
+                        }
+                    })
                 }
             }))
         }
+    });
 
-        (_, _) => {
-            let (parts, body) = req.into_parts();
+    let server = Server::bind(&addr).serve(make_service);
 
-            match router.get(&Trigger::new(parts.method.as_str(), parts.uri.path())) {
-                Some(f) => Box::new(future::ok(f.run(parts, body))),
-                None => Box::new(future::ok(
-                    Response::builder().status(404).body(Body::empty()).unwrap(),
-                )),
-            }
-        }
+    println!("Listening on http://{}", addr);
+
+    if let Err(e) = server.await {
+        eprintln!("server error: {}", e);
     }
-}
-
-fn main() {
-    create_dir_all(Path::new("data/")).unwrap();
-
-    let addr = "127.0.0.1:8000".parse().unwrap();
-
-    hyper::rt::run(future::lazy(move || {
-        let router: Router = Router::new();
-
-        let new_service = move || {
-            let router = router.clone();
-            service_fn(move |req| nanoservices(req, &router))
-        };
-
-        let server = Server::bind(&addr)
-            .serve(new_service)
-            .map_err(|e| eprintln!("server error: {}", e));
-
-        println!("Listening on http://{}", addr);
-        server
-    }));
 }

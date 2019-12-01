@@ -5,10 +5,11 @@ authors = ["Richard do Nascimento Fagundes <richardnas_@outlook.com>"]
 edition = "2018"
 
 [dependencies]
-hyper = "0.12"
+hyper = { git = "https://github.com/hyperium/hyper", features = ["unstable-stream"]}
+tokio = "=0.2.0-alpha.6"
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
-http = "0.1"
-futures = "0.1"
-base64 = "0.10"
+base64 = "0.11"
+futures = "0.3.1"
+futures-util = "0.3.1"

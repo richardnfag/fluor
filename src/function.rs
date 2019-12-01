@@ -4,7 +4,8 @@ use std::path::Path;
 use std::process::Command;
 
 use base64::decode;
-use futures::{Future, Stream};
+use futures::executor::block_on;
+use futures_util::TryStreamExt;
 use serde_derive::Deserialize;
 
 use hyper::{Body, Response};
@@ -68,9 +69,9 @@ impl Function {
     }
 
     pub fn run(&self, _headers: Parts, body: Body) -> Response<Body> {
-        let req = body.concat2().wait().ok().map_or(String::new(), |b| {
-            String::from_utf8_lossy(b.as_ref()).to_string()
-        });
+        let b = block_on(async { body.try_concat().await.unwrap() });
+
+        let req = String::from_utf8_lossy(&b.into_bytes()).to_string();
 
         let output = Command::new("timeout")
             .arg("--signal=SIGKILL")
@@ -86,13 +87,17 @@ impl Function {
             .expect("Failed to execute: docker run");
 
         if !output.status.success() {
+            println!("{}", String::from_utf8_lossy(&output.stderr).to_string());
             return Response::builder()
                 .status(500)
+                .header("Access-Control-Allow-Origin", "*")
                 .body("Internal Server Error".into())
                 .unwrap();
         }
 
         Response::builder()
+            .status(200)
+            .header("Access-Control-Allow-Origin", "*")
             .body(String::from_utf8_lossy(&output.stdout).to_string().into())
             .unwrap()
     }
