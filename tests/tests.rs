@@ -15,7 +15,7 @@ async fn create_function() {
     let body = r#"{
         "name": "hello",
         "language": "rust",
-        "source": "H4sIAAAAAAAAA+3VTUvDMBgH8J7zKbKcNpAu6avgC4Ignjx4HUNCm21hbTKS1ov43W3dhCHoQOiG7P+7BJK0ecgfnoTTYHC8k+dpP4o85fvjl0DEaRbzhCd5FnAheJwHNB2+tCBofSMdpYHTxUq68sd9h9b/qXB6L93Sho2tq6HO6APOsuTH/KMo/pZ/lHfbKR+qoH1nnv9sI4u1XKo5MbJW9Iaylaoqy8ircl5b08/wUIScEdk2K+t8NzNjz9vboKWlT9IXulamsfRBLltTKk+vd7dlpH+5s21TWbsOC1vfsjlRpW52P464uGSEzEq1Ud13ptDKz8mpr+SshFPvioHfgD/0/yzK0P+PYZt/LbUJnR/ojEP9n6fiM/80E0ke9fnHonsS0P+PYGFoH/54Qt8I7WycNk1lRmP2qC/oomqtG7HJFXk/daEAAAAAAAAAAAAAAAAAAPCrD2TfwBsAKAAA",
+        "source": "H4sIAHFK5F0AA+3VTWvCMBgH8JzzKWJOeolJa9vBXhgMxk477LKDyAhtpsU2kaTdZey7z6IDEZwwqDL8/y6B9CUPzx+eiDHpnVzLsqRbVZbI3fUHUXGSKTmZpColUikZp4Ql/ZdGSBsa7RkjvswX2hcH3zv2/J8S4wft5040rq76OqMLOE0nB/OPongv/yhLY8JkXwXtuvD8pyudL/XczKjVtWG3jC9MVTlOP4wPpbPdjhRKSE512yycD+udKX/ZdIMVjj3rkJe1sY1jj3re2sIEdrPtltXh7d61TeXcUuSuvuMzaoqy2f44kuqKUzotzMqsv7N5acKMnrslF0WMg897vgP+MP/TKMH8P4VN/rUurfChpzOOzX+Z7M//WKkE8/8U3i3rwh+O2Cdlaytf2qaygyF/6u4B9up8VQz46Jp+nbtUAAAAAAAAAAAAAAAAAAD4xTf6PZ90ACgAAA==",
         "method": "GET",
         "path": "/hello/",
         "cpu": "2",
