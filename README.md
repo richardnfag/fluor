@@ -1,7 +1,7 @@
 # Fluor Functions
 
 
-Fluor Functions is a serverless platform written in Rust.
+Fluor Functions is a **experimental** serverless platform written in Rust.
 
 ## Architecture
 
@@ -11,35 +11,22 @@ Fluor Functions is a serverless platform written in Rust.
 
 - [Docker CE](https://docs.docker.com/install/)
 
+
 ## Examples
 
 [Hello World example in Rust](examples/rust)
 
-
-```sh
-# run Fluor Service
-cargo run
-
-cd examples/rust
-
-# create new function (hello-rust)
-bash hello.sh new
-
-# invoke function
-bash hello.sh run
-```
+[Hello World example in Python](examples/python)
 
 [Show all examples](examples)
 
 # TODO
-- [ ] Test all
-- [ ] Document
-- [ ] Optimizations
 - [ ] Create CLI
 - [ ] Create Web UI
+- [ ] Create SDK
 - [ ] Templates for more programming languages
-- [ ] Support for Windows
-- [ ] Support others runtimes (LXC, NVIDIA-Docker,...)
+- [ ] Optimizations (reduce function latency)
+- [ ] Support for other operating systems
 
 ## Contributions
 Contributions in the form of bug reports, feature requests, or pull requests are welcome. 
