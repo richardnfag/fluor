@@ -6,8 +6,8 @@ cargo run --release
 cd examples/python
 
 # Creating a compressed archive from project directory
-# -- "hello/" is a project directory
-tar -czvf source.tar.gz -C hello.py .
+# -- "main.py" is a file function
+tar -czvf source.tar.gz main.py
 
 # Creating a new function (hello-python)
 
