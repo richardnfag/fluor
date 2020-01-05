@@ -11,8 +11,6 @@ use function::Function;
 use router::Router;
 use trigger::Trigger;
 
-use futures_util::TryStreamExt;
-
 use std::fs::create_dir_all;
 use std::path::Path;
 
@@ -48,7 +46,7 @@ async fn main() {
                                 .unwrap()
                         }
                         (&Method::POST, "/function/") => {
-                            let b = req.into_body().try_concat().await.unwrap().into_bytes();
+                            let b = hyper::body::to_bytes(req.into_body()).await?;
 
                             match Function::from_json(&b).map(|f| f.build()) {
                                 Some(Ok(f)) => {
@@ -70,7 +68,7 @@ async fn main() {
                         }
 
                         (&Method::DELETE, "/function/") => {
-                            let b = req.into_body().try_concat().await.unwrap().into_bytes();
+                            let b = hyper::body::to_bytes(req.into_body()).await?;
 
                             match Function::from_json(&b) {
                                 Some(f) => f.delete(router),
@@ -86,7 +84,7 @@ async fn main() {
 
                             match router.get(&Trigger::new(parts.method.as_str(), parts.uri.path()))
                             {
-                                Some(f) => f.run(parts, body),
+                                Some(f) => f.run(parts, body).await,
                                 None => {
                                     Response::builder().status(404).body(Body::empty()).unwrap()
                                 }

@@ -1,10 +1,9 @@
-use futures_util::TryStreamExt;
 use hyper::{Body, Client, Request};
 use tokio::runtime::Runtime;
 
 #[test]
 fn function() {
-    let rt = Runtime::new().unwrap();
+    let mut rt = Runtime::new().unwrap();
 
     rt.block_on(create_function());
     rt.block_on(run_function());
@@ -31,15 +30,9 @@ async fn create_function() {
         .body(Body::from(body))
         .expect("request builder");
 
-    let res = client
-        .request(req)
-        .await
-        .unwrap()
-        .into_body()
-        .try_concat()
-        .await
-        .expect("request body concat")
-        .into_bytes();
+    let res = client.request(req).await.unwrap();
+
+    let res = hyper::body::to_bytes(res.into_body()).await.unwrap();
 
     assert_eq!(
         String::from_utf8_lossy(&res),
@@ -56,17 +49,14 @@ async fn run_function() {
         .body(Body::from(""))
         .expect("request builder");
 
-    let res = client
-        .request(req)
-        .await
-        .unwrap()
-        .into_body()
-        .try_concat()
-        .await
-        .expect("request body concat")
-        .into_bytes();
+    let res = client.request(req).await.unwrap();
 
-    assert_eq!(String::from_utf8_lossy(&res), String::from("Hello World!\n"));
+    let res = hyper::body::to_bytes(res.into_body()).await.unwrap();
+
+    assert_eq!(
+        String::from_utf8_lossy(&res),
+        String::from("Hello World!\n")
+    );
 }
 
 async fn delete_function() {
@@ -89,15 +79,9 @@ async fn delete_function() {
         .body(Body::from(body))
         .expect("request builder");
 
-    let res = client
-        .request(req)
-        .await
-        .unwrap()
-        .into_body()
-        .try_concat()
-        .await
-        .expect("request body concat")
-        .into_bytes();
+    let res = client.request(req).await.unwrap();
+
+    let res = hyper::body::to_bytes(res.into_body()).await.unwrap();
 
     assert_eq!(
         String::from_utf8_lossy(&res),

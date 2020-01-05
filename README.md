@@ -1,7 +1,7 @@
-# Fluor Functions
+<h1 style="text-align: center">Fluor Functions</h1>
 
 
-Fluor Functions is a **experimental** serverless platform written in Rust.
+<p style="text-align: center">Fluor Functions is a <b>experimental</b> serverless platform written in Rust.</p>
 
 ## Architecture
 
@@ -14,11 +14,11 @@ Fluor Functions is a **experimental** serverless platform written in Rust.
 
 ## Examples
 
-[Hello World example in Rust](examples/rust)
+- [Hello World example in Rust](examples/rust)
 
-[Hello World example in Python](examples/python)
+- [Hello World example in Python](examples/python)
 
-[Show all examples](examples)
+- [Show all examples](examples)
 
 # TODO
 - [ ] Create CLI

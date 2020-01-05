@@ -1,15 +1,14 @@
 [package]
 name = "fluor"
-version = "0.1.0"
+version = "0.1.3"
 authors = ["Richard do Nascimento Fagundes <richardnas_@outlook.com>"]
 edition = "2018"
 
 [dependencies]
-hyper = { git = "https://github.com/hyperium/hyper", features = ["unstable-stream"]}
-tokio = "=0.2.0-alpha.6"
+hyper = "0.13"
+tokio = { version = "0.2", features = ["macros"] }
 serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 base64 = "0.11"
-futures = "0.3.1"
-futures-util = "0.3.1"
+futures = "0.3"

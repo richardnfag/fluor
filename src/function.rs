@@ -4,8 +4,6 @@ use std::path::Path;
 use std::process::Command;
 
 use base64::decode;
-use futures::executor::block_on;
-use futures_util::TryStreamExt;
 use serde_derive::Deserialize;
 
 use hyper::{Body, Response};
@@ -68,10 +66,10 @@ impl Function {
         Ok(self)
     }
 
-    pub fn run(&self, _headers: Parts, body: Body) -> Response<Body> {
-        let b = block_on(async { body.try_concat().await.unwrap() });
+    pub async fn run(&self, _headers: Parts, body: Body) -> Response<Body> {
+        let b = hyper::body::to_bytes(body).await.unwrap();
 
-        let req = String::from_utf8_lossy(&b.into_bytes()).to_string();
+        let req = String::from_utf8_lossy(&b).to_string();
 
         let output = Command::new("timeout")
             .arg("--signal=SIGKILL")
