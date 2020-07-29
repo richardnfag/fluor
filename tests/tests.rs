@@ -1,9 +1,22 @@
 use hyper::{Body, Client, Request};
 use tokio::runtime::Runtime;
 
+use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
+
 #[test]
 fn function() {
     let mut rt = Runtime::new().unwrap();
+
+    std::thread::spawn(|| {
+        Command::new("timeout")
+            .args(&["180", "cargo", "run"])
+            .spawn()
+            .unwrap();
+    });
+
+    sleep(Duration::from_secs(5));
 
     rt.block_on(create_function());
     rt.block_on(run_function());
