@@ -1,7 +1,9 @@
-<h1 style="text-align: center">Fluor Functions</h1>
+# Fluor Functions
 
+[![CI](https://github.com/richardnas/fluor/workflows/CI/badge.svg)](https://github.com/richardnas/fluor/actions?query=workflow%3ACI)
+[![MIT licensed](https://img.shields.io/github/license/richardnas/fluor?color=%23000c0c)](LICENSE)
 
-<p style="text-align: center">Fluor Functions is a <b>experimental</b> serverless platform written in Rust.</p>
+Fluor Functions is a **experimental** serverless platform written in Rust.
 
 ## Architecture
 
@@ -20,7 +22,7 @@
 
 - [Show all examples](examples)
 
-# TODO
+## TODO
 - [ ] Create CLI
 - [ ] Create Web UI
 - [ ] Create SDK
