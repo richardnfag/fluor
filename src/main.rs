@@ -5,7 +5,7 @@ mod router;
 mod trigger;
 
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Error, Method, Request, Response, Server};
+use hyper::{Body, Method, Response, Server};
 
 use function::Function;
 use router::Router;
@@ -13,6 +13,8 @@ use trigger::Trigger;
 
 use std::fs::create_dir_all;
 use std::path::Path;
+
+type GenericError = Box<dyn std::error::Error + Send + Sync>;
 
 #[tokio::main]
 async fn main() {
@@ -26,11 +28,11 @@ async fn main() {
         let router = router.clone();
 
         async move {
-            Ok::<_, Error>(service_fn(move |req: Request<Body>| {
+            Ok::<_, GenericError>(service_fn(move |req| {
                 let router = router.clone();
 
-                async move {
-                    Ok::<_, Error>(match (req.method(), req.uri().path()) {
+                async {
+                    Ok::<_, GenericError>(match (req.method(), req.uri().path()) {
                         (&Method::GET, "/function/") => {
                             let mut body = String::from("<h1>Functions</h1>");
 
