@@ -7,7 +7,7 @@ use std::time::Duration;
 
 #[test]
 fn function() {
-    let mut rt = Runtime::new().unwrap();
+    let rt = Runtime::new().unwrap();
 
     std::thread::spawn(|| {
         Command::new("timeout")
