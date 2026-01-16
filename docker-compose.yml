@@ -1,0 +1,102 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./api:/app/api:Z
+      - ./core:/app/core:Z
+      - ./examples:/app/examples:Z
+      - sqlite_data:/data/db:Z
+      - cargo_registry:/usr/local/cargo/registry:Z
+      - cargo_git:/usr/local/cargo/git:Z
+      - target_cache:/tmp/target:Z
+      - wasm_data:/data/wasm:Z
+    environment:
+      - CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
+      - RUSTFLAGS=-C link-arg=-fuse-ld=mold
+      - CARGO_TARGET_DIR=/tmp/target
+      - PASSWORD_PEPPER=SECRET_PEPPER
+      - ADMIN_EMAIL=admin@example.com
+      - ADMIN_PASSWORD=admin
+      - DATABASE_URL=sqlite:///data/db/fluor.db
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+      - OTEL_SERVICE_NAME=fluor-api
+      - WASM_STORAGE_PATH=/data/wasm
+      - PORT=3001
+      - HOST=0.0.0.0
+      - CLICKHOUSE_URL=http://clickhouse:8123
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password
+      - CLICKHOUSE_DB=default
+    command: cargo watch -w . -w ../core -x run
+    restart: unless-stopped
+    depends_on:
+      otel-collector:
+        condition: service_started
+
+  ui:
+    build:
+      context: ./ui
+      dockerfile: Dockerfile
+      target: dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./ui:/app:Z
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:3001
+      - API_URL=http://api:3001
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:latest
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse:Z
+    ulimits:
+      nproc: 65535
+      nofile:
+        soft: 262144
+        hard: 262144
+    environment:
+      - CLICKHOUSE_DB=default
+      - CLICKHOUSE_USER=default
+      - CLICKHOUSE_PASSWORD=password
+      - CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1
+      - CLICKHOUSE_LOG_LEVEL=debug
+    healthcheck:
+      test: [ "CMD", "wget", "--spider", "-q", "0.0.0.0:8123/ping" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  otel-collector:
+    image: docker.io/otel/opentelemetry-collector-contrib:latest
+    restart: unless-stopped
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+    volumes:
+      - ./infra/otel/collector-config.yaml:/etc/otelcol-contrib/config.yaml:Z
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+
+volumes:
+  cargo_registry:
+  cargo_git:
+  target_cache:
+  clickhouse_data:
+  wasm_data:
+  sqlite_data:
