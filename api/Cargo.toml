@@ -16,7 +16,7 @@ rand_core = { version = "0.6", features = ["std"] }
 actix-multipart = "0.6"
 uuid = { version = "1.0", features = ["v4"] }
 futures-util = "0.3"
-wasmtime = { version = "26.0", features = ["component-model", "pooling-allocator"] }
+wasmtime = { version = "36.0", features = ["component-model", "pooling-allocator"] }
 wasmtime-wasi = "26.0"
 
 anyhow = "1.0.100"
