@@ -36,3 +36,27 @@ Thumbs.db
 *.profraw
 
 .volumes
+
+
+# Node & Package Managers
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Next.js
+.next/
+out/
+build/
+dist/
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment Variables (Next.js specific)
+.env*.local
