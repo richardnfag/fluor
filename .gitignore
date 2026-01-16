@@ -1,4 +1,38 @@
-/target
+# Rust
+target
+debug
 **/*.rs.bk
-**/*.tar.gz
-Cargo.lock
+
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode
+.idea
+*.swp
+*.swo
+
+# Project
+.env
+.env.*
+! .env.example
+*.db
+*.sqlite
+*.sqlite3
+*.db-shm
+*.db-wal
+/data
+/tmp
+*.log
+
+# Wasm
+*.wasm
+
+# Test coverage
+/api/target/llvm-cov-target
+/api/target/llvm-cov/
+*.profraw
+
+.volumes

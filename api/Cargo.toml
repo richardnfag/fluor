@@ -1,0 +1,43 @@
+[package]
+name = "api"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+actix-web = "4.12.1"
+serde = "1.0.228"
+serde_json = "1.0.145"
+actix-cors = "0.7.1"
+argon2 = "0.5"
+jsonwebtoken = "9.3"
+chrono = { version = "0.4", features = ["serde"] }
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+rand_core = { version = "0.6", features = ["std"] }
+actix-multipart = "0.6"
+uuid = { version = "1.0", features = ["v4"] }
+futures-util = "0.3"
+wasmtime = { version = "26.0", features = ["component-model", "pooling-allocator"] }
+wasmtime-wasi = "26.0"
+
+anyhow = "1.0.100"
+dotenv = "0.15"
+thiserror = "1.0"
+async-trait = "0.1"
+papaya = "0.2.3"
+ahash = "0.8.12"
+tokio = { version = "1.49.0", features = ["full"] }
+tracing-opentelemetry = "0.32.1"
+opentelemetry = { version = "0.31.0", features = ["metrics", "trace", "logs"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
+tracing = "0.1.44"
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "metrics", "trace", "logs"] }
+opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic", "metrics", "trace", "logs"] }
+clickhouse = { version = "0.13", features = ["test-util"] }
+opentelemetry-appender-tracing = "0.31.0"
+
+[dev-dependencies]
+mockall = "0.13.0"
+actix-rt = "2.10.0"
+tempfile = "3.10.0"
+actix-http = "3.9.0"
+actix-test = "0.1.5"
