@@ -7,8 +7,9 @@ use wasmtime::component::{Component, Linker};
 use wasmtime::{
     Config, Engine, InstanceAllocationStrategy, OptLevel, PoolingAllocationConfig, Store,
 };
-use wasmtime_wasi::pipe::MemoryOutputPipe;
-use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiView};
+use wasmtime_wasi::p2::add_to_linker_sync;
+use wasmtime_wasi::p2::pipe::MemoryOutputPipe;
+use wasmtime_wasi::{ResourceTable, WasiCtx, WasiCtxBuilder, WasiCtxView, WasiView};
 
 wasmtime::component::bindgen!({
     inline: "
@@ -27,11 +28,11 @@ struct FluorState {
 }
 
 impl WasiView for FluorState {
-    fn ctx(&mut self) -> &mut WasiCtx {
-        &mut self.ctx
-    }
-    fn table(&mut self) -> &mut ResourceTable {
-        &mut self.table
+    fn ctx(&mut self) -> WasiCtxView<'_> {
+        WasiCtxView {
+            ctx: &mut self.ctx,
+            table: &mut self.table,
+        }
     }
 }
 
@@ -59,7 +60,7 @@ impl WasmtimeRuntime {
         let engine = Engine::new(&config)?;
 
         let mut linker = Linker::new(&engine);
-        wasmtime_wasi::add_to_linker_sync(&mut linker)?;
+        add_to_linker_sync(&mut linker)?;
 
         let cache = Arc::new(HashMap::builder().hasher(RandomState::new()).build());
 

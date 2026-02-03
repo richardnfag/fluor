@@ -11,13 +11,13 @@ actix-cors = "0.7.1"
 argon2 = "0.5"
 jsonwebtoken = "9.3"
 chrono = { version = "0.4", features = ["serde"] }
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-rustls", "sqlite"] }
 rand_core = { version = "0.6", features = ["std"] }
 actix-multipart = "0.6"
 uuid = { version = "1.0", features = ["v4"] }
 futures-util = "0.3"
-wasmtime = { version = "26.0", features = ["component-model", "pooling-allocator"] }
-wasmtime-wasi = "26.0"
+wasmtime = { version = "41.0", features = ["component-model", "pooling-allocator"] }
+wasmtime-wasi = "41.0"
 
 anyhow = "1.0.100"
 dotenv = "0.15"
