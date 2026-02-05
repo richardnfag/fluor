@@ -15,7 +15,7 @@
 
 ![Dashboard](./docs/images/dashboard.jpeg "Dashboard")
 
-## 🚀 Key Features
+## Key Features
 
 - **WASM Runtime**: Functions run in secure, isolated WebAssembly sandboxes using `Wasmtime`.
 - **Polyglot Support**: Write functions in Rust, Python, JavaScript (and any language compiling to WASM/WASI).
@@ -24,7 +24,7 @@
 - **Modern Dashboard**: A sleek, responsive UI built with Next.js 14 and Tailwind CSS for managing resources.
 - **Secure by Design**: JWT Authentication, Argon2 password hashing, and granular resource permissions.
 
-## 🏗️ Architecture
+## Architecture
 
 Fluor is composed of three main components:
 
@@ -45,14 +45,14 @@ Fluor is composed of three main components:
   - Real-time visualizations (Recharts) for execution metrics.
   - Live log streaming.
 
-## 🛠️ Technology Stack
+## Technology Stack
 
 - **Core**: Rust, WebAssembly (WASI P1)
 - **Web**: TypeScript, React, Next.js
 - **Data**: SQLite, ClickHouse
 - **Observability**: OpenTelemetry
 
-## 🚦 Getting Started
+## Getting Started
 
 ### Prerequisites
 - **Rust**: Latest stable toolchain (`rustup`).
@@ -89,7 +89,7 @@ Fluor is composed of three main components:
    - Open browser at `http://localhost:3000`.
    - Default credentials (if seeded): check `api/src/infrastructure/db/sqlite.rs` or register a new user.
 
-## 📦 Usage
+## Usage
 
 ### Deploying a Function
 Upload a compiled `.wasm` file via the UI or API.

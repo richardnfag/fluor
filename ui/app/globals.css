@@ -1,99 +1,99 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+    --background: #ffffff;
+    --foreground: #171717;
 
-  --accents-1: #fafafa;
-  --accents-2: #eaeaea;
-  --accents-3: #999999;
-  --accents-4: #888888;
-  --accents-5: #666666;
-  --accents-6: #444444;
-  --accents-7: #333333;
-  --accents-8: #111111;
+    --accents-1: #fafafa;
+    --accents-2: #eaeaea;
+    --accents-3: #999999;
+    --accents-4: #888888;
+    --accents-5: #666666;
+    --accents-6: #444444;
+    --accents-7: #333333;
+    --accents-8: #111111;
 
-  --success-light: #dff0d8;
-  --success: #0070f3;
-  /* Vercel Blue as primary/success-ish */
-  --success-dark: #0050aa;
+    --success-light: #dff0d8;
+    --success: #0043f0;
+    /* Vercel Blue as primary/success-ish */
+    --success-dark: #c00;
 
-  --error-light: #fef0f0;
-  --error: #e00;
-  --error-dark: #c00;
+    --error-light: #fef0f0;
+    --error: #e00;
+    --error-dark: #c00;
 
-  --warning-light: #fefcf0;
-  --warning: #f5a623;
-  --warning-dark: #cc8b00;
+    --warning-light: #fefcf0;
+    --warning: #f5a623;
+    --warning-dark: #cc8b00;
 
-  --geist-foreground: #000;
-  --geist-background: #fff;
-  --geist-selection: var(--cyan-light);
+    --geist-foreground: #000;
+    --geist-background: #fff;
+    --geist-selection: var(--cyan-light);
 
-  --glass-border: rgba(0, 0, 0, 0.1);
+    --glass-border: rgba(0, 0, 0, 0.1);
 
-  --button-primary-bg: rgba(0, 112, 243, 0.8);
-  --button-primary-text: #ffffff;
+    --button-primary-bg: rgba(0, 112, 243, 0.8);
+    --button-primary-text: #ffffff;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --font-sans: var(--font-geist-sans);
+    --font-mono: var(--font-geist-mono);
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #000000;
-    --foreground: #ededed;
+    :root {
+        --background: #000000;
+        --foreground: #ededed;
 
-    --accents-1: #111111;
-    --accents-2: #333333;
-    --accents-3: #444444;
-    --accents-4: #666666;
-    --accents-5: #888888;
-    --accents-6: #999999;
-    --accents-7: #eaeaea;
-    --accents-8: #fafafa;
+        --accents-1: #111111;
+        --accents-2: #333333;
+        --accents-3: #444444;
+        --accents-4: #666666;
+        --accents-5: #888888;
+        --accents-6: #999999;
+        --accents-7: #eaeaea;
+        --accents-8: #fafafa;
 
-    --geist-foreground: #fff;
-    --geist-background: #000;
+        --geist-foreground: #fff;
+        --geist-background: #000;
 
-    --glass-border: rgba(255, 255, 255, 0.1);
+        --glass-border: rgba(255, 255, 255, 0.1);
 
-    --button-primary-bg: rgba(0, 64, 128, 0.6);
-    --button-primary-text: #ffffff;
-  }
+        --button-primary-bg: rgba(0, 220, 208, 0.4);
+        --button-primary-text: #ffffff;
+    }
 }
 
 body {
-  background:
-    radial-gradient(at 0% 0%, hsla(253, 16%, 90%, 1) 0, transparent 50%),
-    radial-gradient(at 50% 0%, hsla(225, 39%, 90%, 1) 0, transparent 50%),
-    radial-gradient(at 100% 0%, rgb(217, 232, 242) 0, transparent 50%);
-  background-color: #fff;
-  /* Fallback/Base */
-  color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  min-height: 100vh;
+    background:
+        radial-gradient(at 0% 0%, hsla(253, 16%, 90%, 1) 0, transparent 50%),
+        radial-gradient(at 50% 0%, hsla(225, 39%, 90%, 1) 0, transparent 50%),
+        radial-gradient(at 100% 0%, rgb(217, 232, 242) 0, transparent 50%);
+    background-color: #fff;
+    /* Fallback/Base */
+    color: var(--foreground);
+    font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
 }
 
 @media (prefers-color-scheme: dark) {
-  body {
-    background:
-      radial-gradient(at 0% 0%, hsl(223, 64%, 5%) 0, transparent 50%),
-      radial-gradient(at 50% 0%, hsl(210, 71%, 11%) 0, transparent 50%),
-      radial-gradient(at 100% 0%, hsl(215, 62%, 8%) 0, transparent 50%);
-    background-color: #000000;
-  }
+    body {
+        background:
+            radial-gradient(at 0% 0%, hsl(203, 64%, 5%) 0, transparent 50%),
+            radial-gradient(at 50% 0%, hsl(180, 71%, 11%) 0, transparent 50%),
+            radial-gradient(at 100% 0%, hsl(200, 62%, 8%) 0, transparent 50%);
+        background-color: #000000;
+    }
 }
 
 @utility glass-glow {
-  border: 1px solid var(--glass-border);
-  box-shadow:
-    0 0 10px -5px var(--success),
-    inset 0 0 10px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(12px);
+    border: 1px solid var(--glass-border);
+    box-shadow:
+        0 0 10px -5px var(--success),
+        inset 0 0 10px rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(12px);
 }

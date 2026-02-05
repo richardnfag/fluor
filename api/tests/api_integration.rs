@@ -8,6 +8,7 @@ use api::domain::wasm_runtime::WasmRuntime;
 use api::infrastructure::db::clickhouse::ClickHouseRepository;
 use api::infrastructure::db::sqlite::{SqliteRepository, create_pool};
 use api::infrastructure::http::handlers;
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use tempfile::tempdir;
@@ -26,6 +27,7 @@ impl TestRuntime {
     }
 }
 
+#[async_trait]
 impl WasmRuntime for TestRuntime {
     fn load_function(&self, name: &str, wasm_path: &str) -> anyhow::Result<()> {
         let mut functions = self.functions.lock().unwrap();
@@ -33,7 +35,7 @@ impl WasmRuntime for TestRuntime {
         Ok(())
     }
 
-    fn invoke(&self, name: &str, _params: &str) -> anyhow::Result<String> {
+    async fn invoke(&self, name: &str, _params: &str) -> anyhow::Result<String> {
         let functions = self.functions.lock().unwrap();
         if functions.contains_key(name) {
             let resp = serde_json::json!({ "message": format!("Hello from {}", name) });

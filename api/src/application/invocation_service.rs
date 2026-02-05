@@ -95,7 +95,12 @@ impl InvocationService {
     }
 
     #[instrument(skip(self, body), fields(function_name, function_status))]
-    pub fn invoke_http(&self, method: &str, path: &str, body: &str) -> Result<String, DomainError> {
+    pub async fn invoke_http(
+        &self,
+        method: &str,
+        path: &str,
+        body: &str,
+    ) -> Result<String, DomainError> {
         let key = RouteKey {
             method: HttpMethod::from(method),
             path: path.to_string(),
@@ -109,7 +114,7 @@ impl InvocationService {
             if let Some(rt) = &func.runtime {
                 info!(function_name = func.name, "Function {} started", func.name);
                 let start = Instant::now();
-                let result = rt.invoke(&func.name, body);
+                let result = rt.invoke(&func.name, body).await;
                 let duration_ms = start.elapsed().as_millis() as u64;
 
                 let meter = global::meter("fluor-api");
@@ -118,13 +123,19 @@ impl InvocationService {
 
                 let status = match &result {
                     Ok(_) => {
-                        info!(function_name = func.name, "Function {} exited with status ok", func.name);
+                        info!(
+                            function_name = func.name,
+                            "Function {} exited with status ok", func.name
+                        );
                         "ok"
-                    },
+                    }
                     Err(e) => {
-                        info!(function_name = func.name, "Function {} exited with error: {}", func.name, e);
+                        info!(
+                            function_name = func.name,
+                            "Function {} exited with error: {}", func.name, e
+                        );
                         "error"
-                    },
+                    }
                 };
                 tracing::Span::current().record("function.status", status);
 
@@ -205,7 +216,7 @@ mod tests {
         assert!(result.is_ok());
 
         // 2. Invoke
-        let result = service.invoke_http("POST", "/test", "body");
+        let result = service.invoke_http("POST", "/test", "body").await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), "response");
     }
@@ -222,7 +233,7 @@ mod tests {
             Arc::new(runtime),
         );
 
-        let result = service.invoke_http("GET", "/unknown", "");
+        let result = service.invoke_http("GET", "/unknown", "").await;
         assert!(matches!(result, Err(DomainError::NotFound(_))));
     }
 }

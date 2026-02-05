@@ -12,6 +12,11 @@ use api::infrastructure::db::sqlite::SqliteRepository;
 use api::infrastructure::wasm::runtime::WasmtimeRuntime;
 use api::{application, infrastructure};
 
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     dotenv::dotenv().ok();
@@ -19,10 +24,7 @@ async fn main() -> std::io::Result<()> {
 
     // 0. Observability
     infrastructure::telemetry::init_telemetry().expect("Failed to init telemetry");
-    info!(
-        "Starting Fluor API (Hexagonal) at http://0.0.0.0:{}",
-        port_str
-    );
+    info!("Starting Fluor API at http://0.0.0.0:{}", port_str);
 
     // 1. infrastructure / Adapters
     let pool = infrastructure::db::sqlite::init_db().await;

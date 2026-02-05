@@ -10,7 +10,7 @@ pub async fn gateway(
     let method = req.method().as_str();
     let path = req.path().strip_prefix("/function").unwrap_or(req.path());
 
-    match service.invoke_http(method, path, &body) {
+    match service.invoke_http(method, path, &body).await {
         Ok(res) => HttpResponse::Ok().body(res),
         Err(crate::domain::entities::DomainError::NotFound(_)) => {
             HttpResponse::NotFound().body("Function route not found")
