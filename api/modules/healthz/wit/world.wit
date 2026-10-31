@@ -1,5 +1,42 @@
-package fluor:fun;
+package fluor:fun@0.2.0;
+
+interface handler {
+    record header {
+        name: string,
+        value: string,
+    }
+
+    record request {
+        method: string,
+        path: string,
+        query: option<string>,
+        headers: list<header>,
+        body: string,
+    }
+
+    record response {
+        status: u16,
+        headers: list<header>,
+        body: string,
+    }
+
+    enum error-code {
+        bad-request,
+        unauthorized,
+        forbidden,
+        not-found,
+        conflict,
+        internal,
+    }
+
+    record error {
+        code: error-code,
+        message: string,
+    }
+
+    handle: func(request: request) -> result<response, error>;
+}
 
 world function {
-    export handle: func(input: string) -> string;
+    export handler;
 }

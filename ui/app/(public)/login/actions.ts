@@ -3,7 +3,9 @@
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 
-export async function loginAction(prevState: any, formData: FormData) {
+type LoginState = { error?: string } | null;
+
+export async function loginAction(_prevState: LoginState, formData: FormData) {
     const email = formData.get('email') as string;
     const password = formData.get('password') as string;
 

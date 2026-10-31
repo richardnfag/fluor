@@ -4,7 +4,9 @@ use api::application::function_service::FunctionService;
 use api::application::invocation_service::InvocationService;
 use api::application::telemetry_service::TelemetryService;
 use api::application::trigger_service::TriggerService;
-use api::domain::wasm_runtime::WasmRuntime;
+use api::domain::wasm_runtime::{
+    WasmFunctionRequest, WasmFunctionResponse, WasmHeader, WasmInvocation, WasmRuntime,
+};
 use api::infrastructure::db::clickhouse::ClickHouseRepository;
 use api::infrastructure::db::sqlite::{SqliteRepository, create_pool};
 use api::infrastructure::http::handlers;
@@ -27,6 +29,12 @@ impl TestRuntime {
     }
 }
 
+impl Default for TestRuntime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[async_trait]
 impl WasmRuntime for TestRuntime {
     fn load_function(&self, name: &str, wasm_path: &str) -> anyhow::Result<()> {
@@ -35,11 +43,25 @@ impl WasmRuntime for TestRuntime {
         Ok(())
     }
 
-    async fn invoke(&self, name: &str, _params: &str) -> anyhow::Result<String> {
+    async fn invoke(
+        &self,
+        name: &str,
+        request: &WasmFunctionRequest,
+    ) -> anyhow::Result<WasmInvocation> {
         let functions = self.functions.lock().unwrap();
         if functions.contains_key(name) {
-            let resp = serde_json::json!({ "message": format!("Hello from {}", name) });
-            Ok(serde_json::to_string(&resp)?)
+            Ok(Ok(WasmFunctionResponse {
+                status: 200,
+                headers: vec![WasmHeader {
+                    name: "content-type".to_string(),
+                    value: "application/json".to_string(),
+                }],
+                body: serde_json::json!({
+                    "message": format!("Hello from {}", name),
+                    "path": request.path,
+                })
+                .to_string(),
+            }))
         } else {
             Err(anyhow::anyhow!("Function {} not loaded", name))
         }
@@ -243,6 +265,7 @@ async fn test_invocation() {
     // 3. Invoke via Gateway
     let req = test::TestRequest::post()
         .uri("/function/my-func")
+        .set_payload("{\"ping\":true}")
         .to_request();
     let resp = test::call_service(&app, req).await;
 
@@ -252,6 +275,7 @@ async fn test_invocation() {
     let resp: serde_json::Value = serde_json::from_slice(&body_bytes).unwrap();
 
     assert_eq!(resp["message"], "Hello from invoke-func");
+    assert_eq!(resp["path"], "/my-func");
 }
 
 #[actix_rt::test]

@@ -5,7 +5,9 @@ import { revalidatePath } from 'next/cache';
 
 const API_URL = process.env.API_URL || 'http://api:8080';
 
-export async function updateProfile(prevState: any, formData: FormData) {
+type ProfileState = { message: string; success?: boolean } | null;
+
+export async function updateProfile(_prevState: ProfileState, formData: FormData) {
     const cookieStore = await cookies();
     const token = cookieStore.get('token');
 
@@ -33,12 +35,12 @@ export async function updateProfile(prevState: any, formData: FormData) {
 
         revalidatePath('/profile');
         return { message: 'Profile updated successfully', success: true };
-    } catch (e) {
+    } catch {
         return { message: 'Failed to update profile' };
     }
 }
 
-export async function changePassword(prevState: any, formData: FormData) {
+export async function changePassword(_prevState: ProfileState, formData: FormData) {
     const cookieStore = await cookies();
     const token = cookieStore.get('token');
 
@@ -65,7 +67,7 @@ export async function changePassword(prevState: any, formData: FormData) {
         }
 
         return { message: 'Password changed successfully', success: true };
-    } catch (e) {
+    } catch {
         return { message: 'Failed to change password' };
     }
 }

@@ -1,5 +1,0 @@
-package fluor:fun;
-
-world function {
-    export handle: func(input: string) -> string;
-}
