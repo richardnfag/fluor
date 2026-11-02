@@ -19,15 +19,17 @@ export default function TriggersPage() {
     const [isCreateMode, setIsCreateMode] = useState(false);
 
     const fetchTriggers = () => {
-        fetch(`${API_URL}/triggers`)
+        void fetch(`${API_URL}/triggers`)
             .then((res) => res.json())
-            .then((data) => setTriggers(data));
+            .then((data) => setTriggers(data))
+            .catch(() => setTriggers([]));
     };
 
     const fetchFunctions = () => {
-        fetch(`${API_URL}/functions`)
+        void fetch(`${API_URL}/functions`)
             .then((res) => res.json())
-            .then((data) => setFunctions(data));
+            .then((data) => setFunctions(data))
+            .catch(() => setFunctions([]));
     };
 
     useEffect(() => {

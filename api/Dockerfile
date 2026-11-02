@@ -2,7 +2,7 @@
 
 FROM docker.io/library/rust:1.99-slim-trixie AS chef
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends clang mold pkg-config ca-certificates \
+    && apt-get install -y --no-install-recommends ca-certificates clang mold pkg-config \
     && rm -rf /var/lib/apt/lists/*
 RUN cargo install --locked cargo-chef
 WORKDIR /app
@@ -25,7 +25,7 @@ COPY . /app
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
-    cargo build --release && \
+    cargo build --locked --release && \
     cp target/release/api /app/api-binary
 
 FROM chef AS dev

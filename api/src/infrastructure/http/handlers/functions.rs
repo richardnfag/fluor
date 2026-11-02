@@ -29,7 +29,6 @@ async fn handle_multipart(
 ) -> Result<(Option<Function>, Option<String>), String> {
     use futures_util::TryStreamExt;
     use futures_util::stream::StreamExt as _;
-    use std::io::Write;
 
     let mut function: Option<Function> = None;
     let mut temp_path: Option<String> = None;
@@ -47,15 +46,17 @@ async fn handle_multipart(
                     serde_json::from_slice(&bytes).map_err(|e| format!("Invalid JSON: {}", e))?;
                 function = Some(f);
             } else if field_name == "file" {
-                // Read binary part
-                let path = format!("/tmp/{}.wasm", uuid::Uuid::new_v4());
-                let mut f = std::fs::File::create(&path)
-                    .map_err(|e| format!("Failed to create temp file: {}", e))?;
+                let mut bytes = Vec::new();
                 while let Some(chunk) = field.next().await {
                     let data = chunk.map_err(|e| e.to_string())?;
-                    f.write_all(&data)
-                        .map_err(|e| format!("Failed to write: {}", e))?;
+                    bytes.extend_from_slice(&data);
                 }
+                let path = format!("/tmp/{}.wasm", uuid::Uuid::new_v4());
+                let write_path = path.clone();
+                tokio::task::spawn_blocking(move || std::fs::write(&write_path, bytes))
+                    .await
+                    .map_err(|e| format!("Failed to write temp file: {}", e))?
+                    .map_err(|e| format!("Failed to write temp file: {}", e))?;
                 temp_path = Some(path);
             }
         }

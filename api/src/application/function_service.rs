@@ -54,8 +54,7 @@ impl FunctionService {
 
         info!("Stored Wasm for {} at {:?}", name, dest);
 
-        dest.to_str()
-            .map(|s| s.to_string())
+        dest.to_str().map(str::to_string)
             .ok_or_else(|| DomainError::Internal("Invalid path encoding".to_string()))
     }
 
