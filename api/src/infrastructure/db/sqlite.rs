@@ -118,10 +118,12 @@ pub async fn init_db() -> SqlitePool {
 }
 
 pub async fn seed_data(pool: &SqlitePool) {
-    let healthz_component = format!(
-        "{}/modules/healthz/target/wasm32-wasip1/release/healthz.wasm",
-        env!("CARGO_MANIFEST_DIR")
-    );
+    let healthz_component = env::var("HEALTHZ_WASM_PATH").unwrap_or_else(|_| {
+        format!(
+            "{}/modules/healthz/target/wasm32-wasip1/release/healthz.wasm",
+            env!("CARGO_MANIFEST_DIR")
+        )
+    });
 
     // Ensure healthz always exists
     let healthz_exists: (i64,) =

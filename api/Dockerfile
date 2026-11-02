@@ -5,6 +5,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates clang mold pkg-config \
     && rm -rf /var/lib/apt/lists/*
 RUN cargo install --locked cargo-chef
+RUN rustup target add wasm32-wasip2
 WORKDIR /app
 ENV CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER=clang
 ENV RUSTFLAGS="-C link-arg=-fuse-ld=mold"
@@ -26,7 +27,9 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/app/target \
     cargo build --locked --release && \
-    cp target/release/api /app/api-binary
+    cp target/release/api /app/api-binary && \
+    RUSTFLAGS= cargo build --manifest-path modules/healthz/Cargo.toml --target wasm32-wasip2 --locked --release && \
+    cp target/wasm32-wasip2/release/healthz.wasm /app/healthz.wasm
 
 FROM chef AS dev
 RUN cargo install --locked cargo-watch
@@ -42,8 +45,10 @@ RUN apt-get update \
     && chown -R fluor:fluor /app /data
 WORKDIR /app
 COPY --from=builder /app/api-binary /usr/local/bin/fluor-api
+COPY --from=builder /app/healthz.wasm /app/healthz.wasm
 ENV DATABASE_URL=sqlite:///data/db/fluor.db
 ENV WASM_STORAGE_PATH=/data/wasm
+ENV HEALTHZ_WASM_PATH=/app/healthz.wasm
 ENV HOST=0.0.0.0
 ENV PORT=3001
 USER fluor

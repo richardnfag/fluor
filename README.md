@@ -169,6 +169,7 @@ Useful optional variables:
 
 - `DATABASE_URL=sqlite:fluor.db?mode=rwc`
 - `WASM_STORAGE_PATH=wasm_data`
+- `HEALTHZ_WASM_PATH` overrides the seeded healthz component. The runtime image sets it to `/app/healthz.wasm`.
 - `CLICKHOUSE_URL=http://127.0.0.1:8123`
 - `CLICKHOUSE_USER=default`
 - `CLICKHOUSE_PASSWORD=password`
