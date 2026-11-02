@@ -15,10 +15,11 @@
 
 ## What It Is
 
-Fluor has two main parts:
+Fluor has three main parts:
 
 - `api/`: a Rust control plane and HTTP gateway built on Actix Web and Wasmtime
 - `ui/`: a Next.js dashboard for managing functions, triggers, and telemetry
+- `cli/`: a command line client for the same function and trigger API
 
 Control plane data is stored in SQLite. Telemetry is exported with OpenTelemetry and can be stored in ClickHouse.
 
@@ -27,7 +28,7 @@ Control plane data is stored in SQLite. Telemetry is exported with OpenTelemetry
 - Functions are WebAssembly components executed by Wasmtime.
 - Functions are exposed through HTTP triggers.
 - Authentication is JWT-based.
-- The dashboard supports function and trigger management.
+- The dashboard and the `fluor` CLI support function and trigger management.
 - Local development uses `podman`, not Docker.
 
 The current app-level language enum supports:
@@ -249,6 +250,30 @@ The seeded health check is:
   "function": "example-rust"
 }
 ```
+
+### CLI
+
+`cli/` builds a `fluor` binary. It talks to the same routes as the dashboard. The default server is `http://127.0.0.1:8080`; set `FLUOR_API_URL` when the API is on another port.
+
+```bash
+cargo build --manifest-path cli/Cargo.toml
+export FLUOR_API_URL=http://127.0.0.1:18080
+
+cli/target/debug/fluor functions create \
+  --name example-rust \
+  --language rust \
+  --wasm ./example-rust.wasm
+
+cli/target/debug/fluor triggers create \
+  --name example-rust-get \
+  --function example-rust \
+  --method GET \
+  --path /examples/rust
+
+cli/target/debug/fluor invoke /examples/rust --query name=pencil
+```
+
+`functions`, `triggers`, and `invoke` also accept `--json`.
 
 ### Invoke a Function
 
