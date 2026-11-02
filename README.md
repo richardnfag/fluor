@@ -37,7 +37,6 @@ The current app-level language enum supports:
 - `go`
 - `javascript`
 - `csharp`
-- `moonbit`
 
 ## Function Contract (`v2`)
 
@@ -108,12 +107,6 @@ Template and runtime status as of April 22, 2026:
 - `python`: validated via API
 - `javascript`: validated via API
 - `csharp`: validated via API
-- `moonbit`: template builds, but the runtime response is still incorrect due to string encoding issues in the generated guest bindings
-
-In practice:
-
-- `rust`, `go`, `python`, `javascript`, and `csharp` are the currently viable paths
-- `moonbit` should still be treated as experimental
 
 ## Starter Templates
 
@@ -124,7 +117,6 @@ Starter functions live in separate `cargo-generate` repositories:
 - JavaScript: `cargo generate gh:richardnfag/fluor-template-javascript --name my-function`
 - Go: `cargo generate gh:richardnfag/fluor-template-go --name my-function`
 - C#: `cargo generate gh:richardnfag/fluor-template-csharp --name my-function`
-- MoonBit: `cargo generate gh:richardnfag/fluor-template-moonbit --name my-function`
 
 The templates are meant to build WebAssembly components compatible with the contract above.
 
@@ -144,7 +136,6 @@ Language-specific templates also require their own toolchains:
 - JavaScript: `jco`
 - Go: `tinygo`, `wit-bindgen-go`, `wkg`, `wasm-tools`
 - C#: `.NET`, `componentize-dotnet`
-- MoonBit: `moon`, `wit-bindgen`
 
 ### Start Infrastructure
 
@@ -269,7 +260,6 @@ curl -i -X POST http://127.0.0.1:18080/function/example-rust \
 ## Notes
 
 - The README intentionally reflects the current codebase, not older examples or experiments.
-- `moonbit` is listed in the UI/API enum, but it is not yet reliable for real API execution.
 - The current trigger model is HTTP-focused. If you need timers or internal events, that still needs implementation.
 
 ## Contributing

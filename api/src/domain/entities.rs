@@ -20,7 +20,6 @@ pub enum Language {
     Go,
     Csharp,
     Javascript,
-    Moonbit,
 }
 
 impl Language {
@@ -31,7 +30,6 @@ impl Language {
             Language::Go => "go",
             Language::Csharp => "csharp",
             Language::Javascript => "javascript",
-            Language::Moonbit => "moonbit",
         }
     }
 }
@@ -46,7 +44,6 @@ impl std::str::FromStr for Language {
             "go" => Ok(Language::Go),
             "csharp" | "c#" => Ok(Language::Csharp),
             "javascript" | "js" => Ok(Language::Javascript),
-            "moonbit" => Ok(Language::Moonbit),
             _ => Err(()),
         }
     }
@@ -103,7 +100,7 @@ mod tests {
         assert_eq!(Language::from_str("C#"), Ok(Language::Csharp));
         assert_eq!(Language::from_str("javascript"), Ok(Language::Javascript));
         assert_eq!(Language::from_str("js"), Ok(Language::Javascript));
-        assert_eq!(Language::from_str("moonbit"), Ok(Language::Moonbit));
+        assert!(Language::from_str("moonbit").is_err());
         assert!(Language::from_str("unknown").is_err());
     }
 }

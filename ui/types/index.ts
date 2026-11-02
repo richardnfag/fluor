@@ -3,8 +3,7 @@ export type Language =
     | 'rust'
     | 'go'
     | 'csharp'
-    | 'javascript'
-    | 'moonbit';
+    | 'javascript';
 
 export const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
     { value: 'python', label: 'Python' },
@@ -12,7 +11,6 @@ export const LANGUAGE_OPTIONS: Array<{ value: Language; label: string }> = [
     { value: 'go', label: 'Go' },
     { value: 'csharp', label: 'C#' },
     { value: 'javascript', label: 'JavaScript' },
-    { value: 'moonbit', label: 'MoonBit' },
 ];
 
 export interface Function {
