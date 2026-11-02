@@ -14,9 +14,14 @@ pub async fn gateway(
     let headers = req
         .headers()
         .iter()
-        .map(|(name, value)| WasmHeader {
-            name: name.as_str().to_string(),
-            value: String::from_utf8_lossy(value.as_bytes()).into_owned(),
+        .filter_map(|(name, value)| {
+            // WIT strings are Unicode. A header that is not UTF-8 cannot be
+            // represented, so it is omitted instead of replaced with U+FFFD.
+            let value = std::str::from_utf8(value.as_bytes()).ok()?;
+            Some(WasmHeader {
+                name: name.as_str().to_string(),
+                value: value.to_string(),
+            })
         })
         .collect();
 
