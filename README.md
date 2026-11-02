@@ -111,15 +111,17 @@ Template and runtime status as of April 22, 2026:
 
 ## Starter Templates
 
-Starter functions live in separate `cargo-generate` repositories:
+Starter functions live in public `fluor-template-*` repositories. The `fluor` CLI discovers them and generates a project with `cargo-generate`:
 
-- Rust: `cargo generate gh:richardnfag/fluor-template-rust --name my-function`
-- Python: `cargo generate gh:richardnfag/fluor-template-python --name my-function`
-- JavaScript: `cargo generate gh:richardnfag/fluor-template-javascript --name my-function`
-- Go: `cargo generate gh:richardnfag/fluor-template-go --name my-function`
-- C#: `cargo generate gh:richardnfag/fluor-template-csharp --name my-function`
+```bash
+cli/target/debug/fluor templates new rust --name my-function
+cli/target/debug/fluor templates new python --name my-function
+cli/target/debug/fluor templates new javascript --name my-function
+cli/target/debug/fluor templates new go --name my-function
+cli/target/debug/fluor templates new csharp --name my-function
+```
 
-The templates are meant to build WebAssembly components compatible with the contract above.
+See [CLI](#cli) for build, `--ref`, `--output`, and `FLUOR_GITHUB_OWNER`. The templates build WebAssembly components compatible with the contract above.
 
 ## Local Development
 
@@ -128,7 +130,6 @@ The templates are meant to build WebAssembly components compatible with the cont
 - Rust stable
 - Node.js 22+
 - `podman`
-- `cargo-generate`
 - `make`
 
 Language-specific templates also require their own toolchains:
@@ -253,27 +254,69 @@ The seeded health check is:
 
 ### CLI
 
-`cli/` builds a `fluor` binary. It talks to the same routes as the dashboard. The default server is `http://127.0.0.1:8080`; set `FLUOR_API_URL` when the API is on another port.
+`cli/` builds a `fluor` binary. It manages functions and triggers on a Fluor server, and scaffolds projects from the public `fluor-template-*` repositories. The `cargo-generate` crate is a dependency of the CLI, so a separate `cargo-generate` install is not required.
 
 ```bash
 cargo build --manifest-path cli/Cargo.toml
 export FLUOR_API_URL=http://127.0.0.1:18080
+```
+
+The default server is `http://127.0.0.1:8080`. `FLUOR_API_URL` or `--server` selects another one. `--json` prints JSON for `functions`, `triggers`, `invoke`, and `templates`.
+
+#### Functions
+
+```bash
+cli/target/debug/fluor functions list
+cli/target/debug/fluor functions get example-rust
 
 cli/target/debug/fluor functions create \
   --name example-rust \
   --language rust \
   --wasm ./example-rust.wasm
 
+cli/target/debug/fluor functions update example-rust --wasm ./example-rust.wasm
+cli/target/debug/fluor functions delete example-rust
+```
+
+`create` uploads a Wasm component. `update` keeps the stored component when `--wasm` is omitted. `--cpu` defaults to `100m` and `--memory` to `128Mi`. Languages are `rust`, `python`, `go`, `javascript`, and `csharp`.
+
+#### Triggers
+
+```bash
+cli/target/debug/fluor triggers list
 cli/target/debug/fluor triggers create \
   --name example-rust-get \
   --function example-rust \
   --method GET \
   --path /examples/rust
-
-cli/target/debug/fluor invoke /examples/rust --query name=pencil
+cli/target/debug/fluor triggers delete example-rust-get
 ```
 
-`functions`, `triggers`, and `invoke` also accept `--json`.
+#### Invoke
+
+`invoke` calls a trigger through the `/function` gateway. The response body is printed as-is. A status of 400 or higher exits with code 1.
+
+```bash
+cli/target/debug/fluor invoke /examples/rust --query name=pencil
+cli/target/debug/fluor invoke /examples/rust \
+  --method POST \
+  --header 'content-type:application/json' \
+  --data '{"name":"notebook"}'
+```
+
+`--data-file` reads the body from a file. Repeat `--header NAME:VALUE` for more than one header.
+
+#### Templates
+
+`templates` does not need a running Fluor server. It lists public repositories named `fluor-template-*` and skips archived ones. `FLUOR_GITHUB_OWNER` selects the GitHub account. The default is `richardnfag`.
+
+```bash
+cli/target/debug/fluor templates list
+cli/target/debug/fluor templates new rust --name example-rust
+cli/target/debug/fluor templates new go --name example-go --output ./example-go
+```
+
+Generation uses `cargo-generate`. The ref is the head of the newest open pull request in that repository, or the default branch when no pull request is open. `--ref` pins a branch or commit. `--name` fills `{{project-name}}`, `{{crate_name}}`, and `{{project-name | pascal_case}}`. `--output` is the destination directory and defaults to `./{name}`.
 
 ### Invoke a Function
 

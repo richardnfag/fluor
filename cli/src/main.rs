@@ -1,6 +1,9 @@
 use anyhow::{Context, Result, bail};
 use clap::{ArgGroup, Args, Parser, Subcommand};
-use fluor_cli::{Api, FunctionPatch, NewFunction, NewTrigger, canonical_language};
+use fluor_cli::{
+    Api, FunctionPatch, NewFunction, NewTrigger, Templates, canonical_language, created_output,
+    templates_output,
+};
 use std::path::PathBuf;
 use std::process::ExitCode;
 
@@ -14,7 +17,9 @@ Examples:
   fluor functions list
   fluor functions create --name example-rust --language rust --wasm ./example.wasm
   fluor triggers create --name example-rust-get --function example-rust --method GET --path /examples/rust
-  fluor invoke /examples/rust --query name=pencil"
+  fluor invoke /examples/rust --query name=pencil
+  fluor templates list
+  fluor templates new rust --name example-rust"
 )]
 struct Cli {
     /// Fluor API base URL.
@@ -42,6 +47,8 @@ enum Command {
     Triggers(TriggerCommand),
     /// Call a trigger through the /function gateway.
     Invoke(InvokeArgs),
+    /// List and generate projects from fluor-template-* repositories.
+    Templates(TemplateCommand),
 }
 
 #[derive(Args)]
@@ -127,6 +134,44 @@ struct CreateTriggerArgs {
 }
 
 #[derive(Args)]
+struct TemplateCommand {
+    /// GitHub account that publishes the fluor-template-* repositories.
+    #[arg(
+        long,
+        global = true,
+        env = "FLUOR_GITHUB_OWNER",
+        default_value = "richardnfag"
+    )]
+    owner: String,
+
+    #[command(subcommand)]
+    action: TemplateAction,
+}
+
+#[derive(Subcommand)]
+enum TemplateAction {
+    /// List the public function templates.
+    List,
+    /// Generate a project from a template. Placeholders use the project name.
+    New(NewTemplateArgs),
+}
+
+#[derive(Args)]
+struct NewTemplateArgs {
+    /// Template language, for example rust, python, go, javascript, or csharp.
+    #[arg(value_parser = canonical_language)]
+    language: String,
+    #[arg(long)]
+    name: String,
+    /// Directory to create. Defaults to the project name.
+    #[arg(long)]
+    output: Option<PathBuf>,
+    /// Git ref to download. Defaults to the open pull request, then the default branch.
+    #[arg(long = "ref")]
+    git_ref: Option<String>,
+}
+
+#[derive(Args)]
 struct InvokeArgs {
     /// Trigger path, with or without a leading slash.
     path: String,
@@ -164,6 +209,7 @@ async fn run() -> Result<ExitCode> {
         Command::Functions(command) => functions(&api, cli.json, command).await,
         Command::Triggers(command) => triggers(&api, cli.json, command).await,
         Command::Invoke(args) => invoke(&api, cli.json, args).await,
+        Command::Templates(command) => templates(cli.json, command).await,
     }
 }
 
@@ -231,6 +277,33 @@ async fn triggers(api: &Api, json: bool, command: TriggerCommand) -> Result<Exit
         TriggerAction::Delete { name } => {
             api.delete_trigger(&name).await?;
             print_done(json, &format!("deleted trigger {name}"))?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+async fn templates(json: bool, command: TemplateCommand) -> Result<ExitCode> {
+    let templates = Templates::new("https://api.github.com", &command.owner)?;
+    match command.action {
+        TemplateAction::List => {
+            let listed = templates.list().await?;
+            let text = templates_output(&listed, json)?;
+            if json {
+                println!("{text}");
+            } else {
+                print!("{text}");
+            }
+        }
+        TemplateAction::New(args) => {
+            let created = templates
+                .create(
+                    &args.language,
+                    &args.name,
+                    args.output.as_deref(),
+                    args.git_ref.as_deref(),
+                )
+                .await?;
+            print!("{}", created_output(&created, json)?);
         }
     }
     Ok(ExitCode::SUCCESS)

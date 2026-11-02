@@ -243,7 +243,7 @@ impl Api {
     }
 }
 
-fn path_segment(value: &str) -> String {
+pub(crate) fn path_segment(value: &str) -> String {
     let mut encoded = String::new();
     for byte in value.bytes() {
         match byte {

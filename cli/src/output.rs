@@ -1,4 +1,5 @@
 use crate::client::{Function, Trigger};
+use crate::templates::Template;
 
 pub fn functions_text(functions: &[Function]) -> String {
     if functions.is_empty() {
@@ -58,6 +59,30 @@ pub fn trigger_text(trigger: &Trigger) -> String {
         trigger.path,
         trigger.function,
         bool_text(trigger.readonly)
+    )
+}
+
+pub fn templates_text(templates: &[Template]) -> String {
+    if templates.is_empty() {
+        return "No templates.\n".to_string();
+    }
+    let rows = templates
+        .iter()
+        .map(|template| {
+            vec![
+                template.language.clone(),
+                template.repository.clone(),
+                template.git_ref.clone(),
+            ]
+        })
+        .collect::<Vec<_>>();
+    table(&["LANGUAGE", "REPOSITORY", "REF"], &rows)
+}
+
+pub fn template_text(template: &Template) -> String {
+    format!(
+        "language: {}\nrepository: {}\nref: {}\nurl: {}\n",
+        template.language, template.repository, template.git_ref, template.url
     )
 }
 

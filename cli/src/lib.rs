@@ -1,8 +1,12 @@
 mod client;
 mod output;
+mod templates;
 
 pub use client::{Api, FunctionPatch, Invocation, NewFunction, NewTrigger};
-pub use output::{function_text, functions_text, trigger_text, triggers_text};
+pub use output::{
+    function_text, functions_text, template_text, templates_text, trigger_text, triggers_text,
+};
+pub use templates::{CreatedTemplate, Template, Templates, created_output, templates_output};
 
 pub fn canonical_language(value: &str) -> Result<String, String> {
     match value.trim().to_ascii_lowercase().as_str() {
