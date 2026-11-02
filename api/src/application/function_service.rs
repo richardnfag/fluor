@@ -1,7 +1,7 @@
 use crate::domain::entities::{DomainError, Function};
 use crate::domain::ports::FunctionRepository;
 use crate::domain::wasm_runtime::WasmRuntime;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
@@ -16,7 +16,7 @@ pub struct FunctionService {
     runtime: Arc<dyn WasmRuntime>,
     storage_path: String,
     preload_semaphore: Arc<Semaphore>,
-    preloading_functions: Arc<Mutex<HashSet<String>>>,
+    preloading_functions: Arc<Mutex<HashMap<String, Option<String>>>>,
 }
 
 impl FunctionService {
@@ -33,7 +33,7 @@ impl FunctionService {
             runtime,
             storage_path,
             preload_semaphore: Arc::new(Semaphore::new(MAX_BACKGROUND_PRELOADS)),
-            preloading_functions: Arc::new(Mutex::new(HashSet::new())),
+            preloading_functions: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -54,7 +54,8 @@ impl FunctionService {
 
         info!("Stored Wasm for {} at {:?}", name, dest);
 
-        dest.to_str().map(str::to_string)
+        dest.to_str()
+            .map(str::to_string)
             .ok_or_else(|| DomainError::Internal("Invalid path encoding".to_string()))
     }
 
@@ -119,46 +120,59 @@ impl FunctionService {
         task::spawn(async move {
             {
                 let mut loading = preloading_functions.lock().await;
-                if !loading.insert(name.clone()) {
+                if let Some(pending) = loading.get_mut(&name) {
+                    *pending = Some(executable);
                     info!(
                         function_name = %name,
-                        "Skipping duplicate background preload request"
+                        "Queued newer component behind the in-flight preload"
                     );
                     return;
                 }
+                loading.insert(name.clone(), None);
             }
 
-            let permit = match preload_semaphore.acquire_owned().await {
-                Ok(permit) => permit,
-                Err(error) => {
-                    preloading_functions.lock().await.remove(&name);
-                    warn!(
-                        function_name = %name,
-                        error = %error,
-                        "Background preload queue is shutting down"
-                    );
-                    return;
+            let mut executable = executable;
+            loop {
+                let permit = match preload_semaphore.clone().acquire_owned().await {
+                    Ok(permit) => permit,
+                    Err(error) => {
+                        preloading_functions.lock().await.remove(&name);
+                        warn!(
+                            function_name = %name,
+                            error = %error,
+                            "Background preload queue is shutting down"
+                        );
+                        return;
+                    }
+                };
+
+                let runtime = runtime.clone();
+                let load_name = name.clone();
+                let load_executable = executable.clone();
+                let result = task::spawn_blocking(move || {
+                    runtime.load_function(&load_name, &load_executable)
+                })
+                .await;
+
+                drop(permit);
+
+                match result {
+                    Ok(Ok(())) => info!(function_name = %name, "Function preloaded in background"),
+                    Ok(Err(error)) => {
+                        warn!(function_name = %name, error = %error, "Failed to preload wasm in background")
+                    }
+                    Err(error) => {
+                        warn!(function_name = %name, error = %error, "Background preload task panicked")
+                    }
                 }
-            };
 
-            let runtime = runtime.clone();
-            let load_name = name.clone();
-            let load_executable = executable.clone();
-
-            let result =
-                task::spawn_blocking(move || runtime.load_function(&load_name, &load_executable))
-                    .await;
-
-            drop(permit);
-            preloading_functions.lock().await.remove(&name);
-
-            match result {
-                Ok(Ok(())) => info!(function_name = %name, "Function preloaded in background"),
-                Ok(Err(error)) => {
-                    warn!(function_name = %name, error = %error, "Failed to preload wasm in background")
-                }
-                Err(error) => {
-                    warn!(function_name = %name, error = %error, "Background preload task panicked")
+                let mut loading = preloading_functions.lock().await;
+                match loading.get_mut(&name).and_then(|pending| pending.take()) {
+                    Some(next) => executable = next,
+                    None => {
+                        loading.remove(&name);
+                        break;
+                    }
                 }
             }
         });
@@ -171,10 +185,12 @@ mod tests {
     use crate::domain::ports::MockFunctionRepository;
     use crate::domain::wasm_runtime::MockWasmRuntime;
     use mockall::predicate::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::mpsc;
     use std::sync::Mutex as StdMutex;
     use tempfile::tempdir;
     use tokio::sync::oneshot;
-    use tokio::time::{Duration, timeout};
+    use tokio::time::{timeout, Duration};
 
     fn expect_background_load(runtime: &mut MockWasmRuntime) -> oneshot::Receiver<()> {
         let (tx, rx) = oneshot::channel();
@@ -321,6 +337,73 @@ mod tests {
         let result = service.update_function(function).await;
         assert!(result.is_ok());
         wait_for_preload(loaded).await;
+    }
+
+    #[tokio::test]
+    async fn test_update_during_preload_loads_the_newer_binary() {
+        let mut repo = MockFunctionRepository::new();
+        let mut runtime = MockWasmRuntime::new();
+        let temp_dir = tempdir().unwrap();
+        let storage_path = temp_dir.path().to_str().unwrap().to_string();
+
+        repo.expect_update().returning(|f| Ok(f.clone()));
+
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_in_load = calls.clone();
+        let (started_tx, started_rx) = oneshot::channel();
+        let started_tx = StdMutex::new(Some(started_tx));
+        let (release_tx, release_rx) = mpsc::channel();
+        let release_rx = StdMutex::new(release_rx);
+
+        runtime.expect_load_function().returning(move |_, _| {
+            let call = calls_in_load.fetch_add(1, Ordering::SeqCst);
+            if call == 0 {
+                if let Some(tx) = started_tx.lock().expect("preload start").take() {
+                    let _ = tx.send(());
+                }
+                let _ = release_rx.lock().expect("preload release").recv();
+            }
+            Ok(())
+        });
+
+        let first = temp_dir.path().join("first.wasm");
+        let second = temp_dir.path().join("second.wasm");
+        fs::write(&first, "first").unwrap();
+        fs::write(&second, "second").unwrap();
+
+        let service = FunctionService::new(Arc::new(repo), Arc::new(runtime), storage_path);
+        service
+            .update_function(Function {
+                name: "test-func".to_string(),
+                executable: first.to_str().unwrap().to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+
+        timeout(Duration::from_secs(2), started_rx)
+            .await
+            .expect("first preload did not start")
+            .expect("first preload notifier dropped");
+
+        service
+            .update_function(Function {
+                name: "test-func".to_string(),
+                executable: second.to_str().unwrap().to_string(),
+                ..Default::default()
+            })
+            .await
+            .unwrap();
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        release_tx.send(()).expect("release preload");
+
+        timeout(Duration::from_secs(2), async {
+            while calls.load(Ordering::SeqCst) < 2 {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("newer preload did not run");
     }
 
     #[tokio::test]
