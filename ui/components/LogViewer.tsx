@@ -2,7 +2,7 @@
 
 import { Card } from '@/components/ui/Card';
 
-interface LogEntry {
+export interface LogEntry {
     timestamp: string;
     level: string;
     body: string;

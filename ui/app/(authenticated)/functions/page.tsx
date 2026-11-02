@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Function, Trigger } from "@/types";
+import { useRouter } from "next/navigation";
+import { Function, LANGUAGE_OPTIONS, Language, Trigger } from "@/types";
 import {
   PrimaryButton,
   GhostButton,
@@ -17,6 +18,7 @@ import { Pencil, Trash2, Plus, Play } from "lucide-react";
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 export default function FunctionsPage() {
+  const router = useRouter();
   const [functions, setFunctions] = useState<Function[]>([]);
   const [triggers, setTriggers] = useState<Trigger[]>([]); // All triggers
   const [selectedFunction, setSelectedFunction] = useState<Function | null>(
@@ -33,11 +35,6 @@ export default function FunctionsPage() {
   const [availableRoutes, setAvailableRoutes] = useState<Trigger[]>([]);
   const [selectedRoute, setSelectedRoute] = useState<string>("manual"); // 'manual' or trigger name
 
-  useEffect(() => {
-    fetchFunctions();
-    fetchTriggers();
-  }, []);
-
   const fetchFunctions = () => {
     fetch(`${API_URL}/functions`)
       .then((res) => res.json())
@@ -49,6 +46,11 @@ export default function FunctionsPage() {
       .then((res) => res.json())
       .then((data) => setTriggers(data));
   };
+
+  useEffect(() => {
+    fetchFunctions();
+    fetchTriggers();
+  }, []);
 
   const handleEdit = (func: Function) => {
     setSelectedFunction({ ...func });
@@ -81,7 +83,6 @@ export default function FunctionsPage() {
       const method = isCreateMode ? "POST" : "PUT";
 
       let body: string | FormData;
-      let headers: Record<string, string> = {};
 
       if (selectedFile) {
         const formData = new FormData();
@@ -92,8 +93,11 @@ export default function FunctionsPage() {
         // Content-Type header is set automatically by browser for FormData
       } else {
         body = JSON.stringify(selectedFunction);
-        headers["Content-Type"] = "application/json";
       }
+
+      const headers: Record<string, string> = selectedFile
+        ? {}
+        : { "Content-Type": "application/json" };
 
       const res = await fetch(url, {
         method: method,
@@ -228,9 +232,7 @@ export default function FunctionsPage() {
                   <div className="flex gap-2">
                     <GhostButton
                       size="sm"
-                      onClick={() =>
-                        (window.location.href = `/functions/${func.name}`)
-                      }
+                      onClick={() => router.push(`/functions/${func.name}`)}
                       className="h-8 w-8 p-0"
                       title="View Details"
                     >
@@ -307,17 +309,13 @@ export default function FunctionsPage() {
               label="Language"
               value={selectedFunction.language}
               onChange={(e) => {
-                const newLang = e.target.value as any;
+                const newLang = e.target.value as Language;
                 setSelectedFunction({
                   ...selectedFunction,
                   language: newLang,
                 });
               }}
-              options={[
-                { value: "python", label: "Python" },
-                { value: "rust", label: "Rust" },
-                { value: "go", label: "Go" },
-              ]}
+              options={LANGUAGE_OPTIONS}
             />
             <div className="space-y-1.5">
               <label

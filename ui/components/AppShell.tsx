@@ -4,9 +4,7 @@ import {
     LayoutDashboard,
     Code2,
     Zap,
-    Settings,
     User,
-    Workflow,
     LogOut,
     FunctionSquare
 } from 'lucide-react';

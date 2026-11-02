@@ -1,15 +1,22 @@
 use crate::domain::entities::{DomainError, Function};
 use crate::domain::ports::FunctionRepository;
 use crate::domain::wasm_runtime::WasmRuntime;
+use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 use std::sync::Arc;
+use tokio::sync::{Mutex, Semaphore};
+use tokio::task;
 use tracing::{info, warn};
+
+const MAX_BACKGROUND_PRELOADS: usize = 1;
 
 pub struct FunctionService {
     repository: Arc<dyn FunctionRepository>,
     runtime: Arc<dyn WasmRuntime>,
     storage_path: String,
+    preload_semaphore: Arc<Semaphore>,
+    preloading_functions: Arc<Mutex<HashSet<String>>>,
 }
 
 impl FunctionService {
@@ -25,6 +32,8 @@ impl FunctionService {
             repository,
             runtime,
             storage_path,
+            preload_semaphore: Arc::new(Semaphore::new(MAX_BACKGROUND_PRELOADS)),
+            preloading_functions: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -58,13 +67,7 @@ impl FunctionService {
 
         let created = self.repository.save(&function).await?;
 
-        if !created.executable.is_empty()
-            && let Err(e) = self
-                .runtime
-                .load_function(&created.name, &created.executable)
-            {
-                warn!("Failed to preload wasm: {}", e);
-            }
+        self.preload_function(created.clone());
 
         Ok(created)
     }
@@ -76,18 +79,20 @@ impl FunctionService {
         }
 
         let updated = self.repository.update(&function).await?;
-        if !updated.executable.is_empty()
-            && let Err(e) = self
-                .runtime
-                .load_function(&updated.name, &updated.executable)
-            {
-                warn!("Failed to reload wasm: {}", e);
-            }
+        self.preload_function(updated.clone());
         Ok(updated)
     }
 
     pub async fn list_functions(&self) -> Result<Vec<Function>, DomainError> {
         self.repository.find_all().await
+    }
+
+    pub async fn preload_existing(&self) -> Result<(), DomainError> {
+        let functions = self.repository.find_all().await?;
+        for function in functions {
+            self.preload_function(function);
+        }
+        Ok(())
     }
 
     pub async fn get_function(&self, name: &str) -> Result<Function, DomainError> {
@@ -100,6 +105,65 @@ impl FunctionService {
     pub async fn delete_function(&self, name: &str) -> Result<(), DomainError> {
         self.repository.delete(name).await
     }
+
+    fn preload_function(&self, function: Function) {
+        if function.executable.is_empty() {
+            return;
+        }
+
+        let runtime = self.runtime.clone();
+        let name = function.name.clone();
+        let executable = function.executable.clone();
+        let preload_semaphore = self.preload_semaphore.clone();
+        let preloading_functions = self.preloading_functions.clone();
+
+        task::spawn(async move {
+            {
+                let mut loading = preloading_functions.lock().await;
+                if !loading.insert(name.clone()) {
+                    info!(
+                        function_name = %name,
+                        "Skipping duplicate background preload request"
+                    );
+                    return;
+                }
+            }
+
+            let permit = match preload_semaphore.acquire_owned().await {
+                Ok(permit) => permit,
+                Err(error) => {
+                    preloading_functions.lock().await.remove(&name);
+                    warn!(
+                        function_name = %name,
+                        error = %error,
+                        "Background preload queue is shutting down"
+                    );
+                    return;
+                }
+            };
+
+            let runtime = runtime.clone();
+            let load_name = name.clone();
+            let load_executable = executable.clone();
+
+            let result =
+                task::spawn_blocking(move || runtime.load_function(&load_name, &load_executable))
+                    .await;
+
+            drop(permit);
+            preloading_functions.lock().await.remove(&name);
+
+            match result {
+                Ok(Ok(())) => info!(function_name = %name, "Function preloaded in background"),
+                Ok(Err(error)) => {
+                    warn!(function_name = %name, error = %error, "Failed to preload wasm in background")
+                }
+                Err(error) => {
+                    warn!(function_name = %name, error = %error, "Background preload task panicked")
+                }
+            }
+        });
+    }
 }
 
 #[cfg(test)]
@@ -108,7 +172,29 @@ mod tests {
     use crate::domain::ports::MockFunctionRepository;
     use crate::domain::wasm_runtime::MockWasmRuntime;
     use mockall::predicate::*;
+    use std::sync::Mutex as StdMutex;
     use tempfile::tempdir;
+    use tokio::sync::oneshot;
+    use tokio::time::{Duration, timeout};
+
+    fn expect_background_load(runtime: &mut MockWasmRuntime) -> oneshot::Receiver<()> {
+        let (tx, rx) = oneshot::channel();
+        let tx = StdMutex::new(Some(tx));
+        runtime.expect_load_function().returning(move |_, _| {
+            if let Some(tx) = tx.lock().expect("preload notifier").take() {
+                let _ = tx.send(());
+            }
+            Ok(())
+        });
+        rx
+    }
+
+    async fn wait_for_preload(rx: oneshot::Receiver<()>) {
+        timeout(Duration::from_secs(2), rx)
+            .await
+            .expect("background preload timed out")
+            .expect("background preload notifier dropped");
+    }
 
     #[tokio::test]
     async fn test_create_function() {
@@ -121,7 +207,7 @@ mod tests {
             .with(always())
             .returning(|f| Ok(f.clone()));
 
-        runtime.expect_load_function().returning(|_, _| Ok(()));
+        let loaded = expect_background_load(&mut runtime);
 
         let service = FunctionService::new(Arc::new(repo), Arc::new(runtime), storage_path.clone());
 
@@ -141,6 +227,7 @@ mod tests {
         let created = result.unwrap();
         assert!(created.executable.starts_with(&storage_path));
         assert!(Path::new(&created.executable).exists());
+        wait_for_preload(loaded).await;
     }
     #[tokio::test]
     async fn test_get_function_found() {
@@ -218,8 +305,7 @@ mod tests {
 
         repo.expect_update().returning(|f| Ok(f.clone()));
 
-        // Expect reload if executable present
-        runtime.expect_load_function().returning(|_, _| Ok(()));
+        let loaded = expect_background_load(&mut runtime);
 
         // Create dummy file for update
         let source_file = temp_dir.path().join("update.wasm");
@@ -235,6 +321,38 @@ mod tests {
 
         let result = service.update_function(function).await;
         assert!(result.is_ok());
+        wait_for_preload(loaded).await;
+    }
+
+    #[tokio::test]
+    async fn test_preload_existing_loads_functions_with_executables() {
+        let mut repo = MockFunctionRepository::new();
+        let mut runtime = MockWasmRuntime::new();
+        let temp_dir = tempdir().unwrap();
+        let storage_path = temp_dir.path().to_str().unwrap().to_string();
+        let wasm_path = temp_dir.path().join("healthz.wasm");
+        fs::write(&wasm_path, "wasm").unwrap();
+        let executable = wasm_path.to_str().unwrap().to_string();
+
+        repo.expect_find_all().returning(move || {
+            Ok(vec![
+                Function {
+                    name: "healthz".to_string(),
+                    executable: executable.clone(),
+                    ..Default::default()
+                },
+                Function {
+                    name: "empty".to_string(),
+                    ..Default::default()
+                },
+            ])
+        });
+
+        let loaded = expect_background_load(&mut runtime);
+        let service = FunctionService::new(Arc::new(repo), Arc::new(runtime), storage_path);
+
+        service.preload_existing().await.unwrap();
+        wait_for_preload(loaded).await;
     }
 
     #[tokio::test]

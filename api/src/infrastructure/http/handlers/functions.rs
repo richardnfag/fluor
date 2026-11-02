@@ -35,8 +35,7 @@ async fn handle_multipart(
     let mut temp_path: Option<String> = None;
 
     while let Ok(Some(mut field)) = payload.try_next().await {
-        let content_disposition = field.content_disposition();
-        if let Some(field_name) = content_disposition.get_name() {
+        if let Some(field_name) = field.name() {
             if field_name == "function" {
                 // Read JSON part
                 let mut bytes = Vec::new();
