@@ -36,15 +36,17 @@ export default function FunctionsPage() {
   const [selectedRoute, setSelectedRoute] = useState<string>("manual"); // 'manual' or trigger name
 
   const fetchFunctions = () => {
-    fetch(`${API_URL}/functions`)
+    void fetch(`${API_URL}/functions`)
       .then((res) => res.json())
-      .then((data) => setFunctions(data));
+      .then((data) => setFunctions(data))
+      .catch(() => setFunctions([]));
   };
 
   const fetchTriggers = () => {
-    fetch(`${API_URL}/triggers`)
+    void fetch(`${API_URL}/triggers`)
       .then((res) => res.json())
-      .then((data) => setTriggers(data));
+      .then((data) => setTriggers(data))
+      .catch(() => setTriggers([]));
   };
 
   useEffect(() => {
@@ -246,6 +248,7 @@ export default function FunctionsPage() {
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
+                        aria-hidden="true"
                       >
                         <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
                         <circle cx="12" cy="12" r="3" />
