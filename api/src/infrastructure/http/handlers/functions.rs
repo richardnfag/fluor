@@ -23,46 +23,91 @@ async fn get_function(
     }
 }
 
+const MAX_FUNCTION_JSON_BYTES: usize = 64 * 1024;
+const MAX_WASM_BYTES: usize = 64 * 1024 * 1024;
+
 // --- Helper for handling multipart ---
 async fn handle_multipart(
     mut payload: actix_multipart::Multipart,
 ) -> Result<(Option<Function>, Option<String>), String> {
     use futures_util::TryStreamExt;
-    use futures_util::stream::StreamExt as _;
 
     let mut function: Option<Function> = None;
     let mut temp_path: Option<String> = None;
 
-    while let Ok(Some(mut field)) = payload.try_next().await {
-        if let Some(field_name) = field.name() {
-            if field_name == "function" {
-                // Read JSON part
-                let mut bytes = Vec::new();
-                while let Some(chunk) = field.next().await {
-                    let data = chunk.map_err(|e| e.to_string())?;
-                    bytes.extend_from_slice(&data);
-                }
-                let f: Function =
+    while let Ok(Some(field)) = payload.try_next().await {
+        let field_name = field.name().map(str::to_string);
+        match field_name.as_deref() {
+            Some("function") => {
+                let bytes = read_limited(field, MAX_FUNCTION_JSON_BYTES, "function metadata").await?;
+                let parsed: Function =
                     serde_json::from_slice(&bytes).map_err(|e| format!("Invalid JSON: {}", e))?;
-                function = Some(f);
-            } else if field_name == "file" {
-                let mut bytes = Vec::new();
-                while let Some(chunk) = field.next().await {
-                    let data = chunk.map_err(|e| e.to_string())?;
-                    bytes.extend_from_slice(&data);
-                }
-                let path = format!("/tmp/{}.wasm", uuid::Uuid::new_v4());
-                let write_path = path.clone();
-                tokio::task::spawn_blocking(move || std::fs::write(&write_path, bytes))
-                    .await
-                    .map_err(|e| format!("Failed to write temp file: {}", e))?
-                    .map_err(|e| format!("Failed to write temp file: {}", e))?;
-                temp_path = Some(path);
+                function = Some(parsed);
             }
+            Some("file") => {
+                temp_path = Some(write_wasm_field(field).await?);
+            }
+            _ => {}
         }
     }
 
     Ok((function, temp_path))
+}
+
+async fn read_limited(
+    mut field: actix_multipart::Field,
+    limit: usize,
+    label: &str,
+) -> Result<Vec<u8>, String> {
+    use futures_util::stream::StreamExt as _;
+
+    let mut bytes = Vec::new();
+    while let Some(chunk) = field.next().await {
+        let data = chunk.map_err(|e| e.to_string())?;
+        if bytes.len().saturating_add(data.len()) > limit {
+            return Err(format!("{label} exceeds {limit} bytes"));
+        }
+        bytes.extend_from_slice(&data);
+    }
+    Ok(bytes)
+}
+
+async fn write_wasm_field(mut field: actix_multipart::Field) -> Result<String, String> {
+    use futures_util::stream::StreamExt as _;
+    use tokio::io::AsyncWriteExt;
+
+    let path = format!("/tmp/{}.wasm", uuid::Uuid::new_v4());
+    let mut file = tokio::fs::File::create(&path)
+        .await
+        .map_err(|e| format!("Failed to create temp file: {e}"))?;
+    let mut total = 0usize;
+    while let Some(chunk) = field.next().await {
+        let data = match chunk {
+            Ok(data) => data,
+            Err(e) => {
+                drop(file);
+                let _ = tokio::fs::remove_file(&path).await;
+                return Err(e.to_string());
+            }
+        };
+        total = total.saturating_add(data.len());
+        if total > MAX_WASM_BYTES {
+            drop(file);
+            let _ = tokio::fs::remove_file(&path).await;
+            return Err(format!("Wasm binary exceeds {MAX_WASM_BYTES} bytes"));
+        }
+        if let Err(e) = file.write_all(&data).await {
+            drop(file);
+            let _ = tokio::fs::remove_file(&path).await;
+            return Err(format!("Failed to write temp file: {e}"));
+        }
+    }
+    if let Err(e) = file.flush().await {
+        drop(file);
+        let _ = tokio::fs::remove_file(&path).await;
+        return Err(format!("Failed to write temp file: {e}"));
+    }
+    Ok(path)
 }
 
 // --- Handlers ---
