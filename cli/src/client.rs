@@ -89,7 +89,7 @@ impl Api {
             executable: function
                 .wasm
                 .file_name()
-                .and_then(|name| name.to_str())
+                .and_then(std::ffi::OsStr::to_str)
                 .unwrap_or("function.wasm")
                 .to_string(),
             cpu: function.cpu.clone(),

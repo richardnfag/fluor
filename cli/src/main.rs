@@ -311,7 +311,8 @@ async fn templates(json: bool, command: TemplateCommand) -> Result<ExitCode> {
 
 async fn invoke(api: &Api, json: bool, args: InvokeArgs) -> Result<ExitCode> {
     let body = match args.data_file {
-        Some(path) => std::fs::read_to_string(&path)
+        Some(path) => tokio::fs::read_to_string(&path)
+            .await
             .with_context(|| format!("failed to read {}", path.display()))?,
         None => args.data.unwrap_or_default(),
     };
