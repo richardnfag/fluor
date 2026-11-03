@@ -1,5 +1,9 @@
 .git
 .volumes
 target
+wasm_data
+fluor.db
+.env
+tests
 *.md
 Makefile

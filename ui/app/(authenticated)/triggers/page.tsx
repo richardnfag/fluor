@@ -18,22 +18,24 @@ export default function TriggersPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isCreateMode, setIsCreateMode] = useState(false);
 
+    const fetchTriggers = () => {
+        void fetch(`${API_URL}/triggers`)
+            .then((res) => res.json())
+            .then((data) => setTriggers(data))
+            .catch(() => setTriggers([]));
+    };
+
+    const fetchFunctions = () => {
+        void fetch(`${API_URL}/functions`)
+            .then((res) => res.json())
+            .then((data) => setFunctions(data))
+            .catch(() => setFunctions([]));
+    };
+
     useEffect(() => {
         fetchTriggers();
         fetchFunctions();
     }, []);
-
-    const fetchTriggers = () => {
-        fetch(`${API_URL}/triggers`)
-            .then((res) => res.json())
-            .then((data) => setTriggers(data));
-    };
-
-    const fetchFunctions = () => {
-        fetch(`${API_URL}/functions`)
-            .then((res) => res.json())
-            .then((data) => setFunctions(data));
-    };
 
     const handleEdit = (trigger: Trigger) => {
         setSelectedTrigger({ ...trigger });

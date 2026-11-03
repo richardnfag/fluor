@@ -3,7 +3,7 @@
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { Card } from '@/components/ui/Card';
 
-interface ExecutionMetric {
+export interface ExecutionMetric {
     time_bucket: string;
     count: number;
 }

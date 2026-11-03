@@ -1,14 +1,13 @@
 "use client";
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Function, Trigger } from '@/types';
+import { Function } from '@/types';
 import { PrimaryButton, SecondaryButton } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
-import { ArrowLeft, Play, RefreshCw } from 'lucide-react';
-import { ExecutionsChart } from '@/components/ExecutionsChart';
-import { LogViewer } from '@/components/LogViewer';
-import Editor from '@monaco-editor/react';
+import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { ExecutionsChart, ExecutionMetric } from '@/components/ExecutionsChart';
+import { LogViewer, LogEntry } from '@/components/LogViewer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 
@@ -18,20 +17,13 @@ export default function FunctionDetailsPage() {
     const functionName = params?.name as string;
 
     const [func, setFunc] = useState<Function | null>(null);
-    const [metrics, setMetrics] = useState<any[]>([]);
-    const [logs, setLogs] = useState<any[]>([]);
+    const [metrics, setMetrics] = useState<ExecutionMetric[]>([]);
+    const [logs, setLogs] = useState<LogEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    useEffect(() => {
-        if (functionName) {
-            fetchData();
-        }
-    }, [functionName]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         try {
-            setRefreshing(true);
             // Fetch function details
             // We might not have a direct endpoint for single function by name if list is used,
             // but let's assume we can fetch list and find it, or use the list endpoint with filter if supported.
@@ -72,7 +64,17 @@ export default function FunctionDetailsPage() {
             setLoading(false);
             setRefreshing(false);
         }
-    };
+    }, [functionName]);
+
+    useEffect(() => {
+        if (!functionName) {
+            return;
+        }
+        // The request resolves before state is updated. The rule flags the call
+        // because the loader also clears the pending flag in finally.
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch result is applied after await
+        void fetchData();
+    }, [functionName, fetchData]);
 
     if (loading) {
         return <div className="p-8 text-[var(--accents-5)]">Loading...</div>;
@@ -105,7 +107,10 @@ export default function FunctionDetailsPage() {
                     </div>
                 </div>
                 <div className="flex gap-2">
-                    <SecondaryButton onClick={fetchData} disabled={refreshing}>
+                    <SecondaryButton onClick={() => {
+                        setRefreshing(true);
+                        void fetchData();
+                    }} disabled={refreshing}>
                         <RefreshCw size={16} className={`mr-2 ${refreshing ? "animate-spin" : ""}`} />
                         Refresh
                     </SecondaryButton>

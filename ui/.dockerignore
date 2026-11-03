@@ -1,4 +1,6 @@
 .git
 node_modules
 .next
+npm-debug.log*
+.env*
 *.md

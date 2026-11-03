@@ -1,5 +1,4 @@
 import { User } from '@/types';
-import { Card } from '@/components/ui/Card';
 import { PrimaryButton } from '@/components/ui/Button';
 import { LogOut } from 'lucide-react';
 import { logoutAction } from '../../actions';

@@ -18,6 +18,35 @@ pub enum Language {
     Python,
     Rust,
     Go,
+    Csharp,
+    Javascript,
+}
+
+impl Language {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Language::Python => "python",
+            Language::Rust => "rust",
+            Language::Go => "go",
+            Language::Csharp => "csharp",
+            Language::Javascript => "javascript",
+        }
+    }
+}
+
+impl std::str::FromStr for Language {
+    type Err = ();
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value.trim().to_ascii_lowercase().as_str() {
+            "python" => Ok(Language::Python),
+            "rust" => Ok(Language::Rust),
+            "go" => Ok(Language::Go),
+            "csharp" | "c#" => Ok(Language::Csharp),
+            "javascript" | "js" => Ok(Language::Javascript),
+            _ => Err(()),
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -55,4 +84,23 @@ pub enum DomainError {
     Internal(String),
     #[error("Already exists: {0}")]
     AlreadyExists(String),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Language;
+    use std::str::FromStr;
+
+    #[test]
+    fn parses_supported_languages() {
+        assert_eq!(Language::from_str("python"), Ok(Language::Python));
+        assert_eq!(Language::from_str("rust"), Ok(Language::Rust));
+        assert_eq!(Language::from_str("go"), Ok(Language::Go));
+        assert_eq!(Language::from_str("csharp"), Ok(Language::Csharp));
+        assert_eq!(Language::from_str("C#"), Ok(Language::Csharp));
+        assert_eq!(Language::from_str("javascript"), Ok(Language::Javascript));
+        assert_eq!(Language::from_str("js"), Ok(Language::Javascript));
+        assert!(Language::from_str("moonbit").is_err());
+        assert!(Language::from_str("unknown").is_err());
+    }
 }

@@ -1,4 +1,6 @@
 use crate::application::invocation_service::InvocationService;
+use crate::domain::wasm_runtime::{WasmFunctionRequest, WasmHeader};
+use actix_web::http::{StatusCode, header::HeaderName, header::HeaderValue};
 use actix_web::{HttpRequest, HttpResponse, Responder, web};
 use std::sync::Arc;
 
@@ -7,11 +9,53 @@ pub async fn gateway(
     body: String,
     service: web::Data<Arc<InvocationService>>,
 ) -> impl Responder {
-    let method = req.method().as_str();
     let path = req.path().strip_prefix("/function").unwrap_or(req.path());
+    let query = (!req.query_string().is_empty()).then(|| req.query_string().to_string());
+    let headers = req
+        .headers()
+        .iter()
+        .filter_map(|(name, value)| {
+            // WIT strings are Unicode. A header that is not UTF-8 cannot be
+            // represented, so it is omitted instead of replaced with U+FFFD.
+            let value = std::str::from_utf8(value.as_bytes()).ok()?;
+            Some(WasmHeader {
+                name: name.as_str().to_string(),
+                value: value.to_string(),
+            })
+        })
+        .collect();
 
-    match service.invoke_http(method, path, &body).await {
-        Ok(res) => HttpResponse::Ok().body(res),
+    let invocation = WasmFunctionRequest {
+        method: req.method().as_str().to_string(),
+        path: path.to_string(),
+        query,
+        headers,
+        body,
+    };
+
+    match service.invoke_http(invocation).await {
+        Ok(Ok(res)) => {
+            let status =
+                StatusCode::from_u16(res.status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            let mut builder = HttpResponse::build(status);
+
+            for header in res.headers {
+                let Ok(name) = HeaderName::try_from(header.name) else {
+                    continue;
+                };
+                let Ok(value) = HeaderValue::try_from(header.value) else {
+                    continue;
+                };
+                builder.append_header((name, value));
+            }
+
+            builder.body(res.body)
+        }
+        Ok(Err(err)) => {
+            let status = StatusCode::from_u16(err.http_status())
+                .unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);
+            HttpResponse::build(status).json(err)
+        }
         Err(crate::domain::entities::DomainError::NotFound(_)) => {
             HttpResponse::NotFound().body("Function route not found")
         }

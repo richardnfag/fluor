@@ -1,8 +1,8 @@
 use crate::domain::entities::DomainError;
 use crate::domain::ports::UserRepository;
 use argon2::{
-    Algorithm, Argon2, Params, PasswordHasher, Version,
-    password_hash::{PasswordHash, PasswordVerifier},
+    Algorithm, Argon2, Params, PasswordHasher, PasswordVerifier, Version,
+    password_hash::phc::PasswordHash,
 };
 use chrono::{Duration, Utc};
 use jsonwebtoken::{EncodingKey, Header, encode};
@@ -79,8 +79,11 @@ impl AuthService {
         Ok(token)
     }
 
-    pub async fn get_current_user(&self, token: &str) -> Result<crate::domain::entities::User, DomainError> {
-        use jsonwebtoken::{Validation, DecodingKey, decode};
+    pub async fn get_current_user(
+        &self,
+        token: &str,
+    ) -> Result<crate::domain::entities::User, DomainError> {
+        use jsonwebtoken::{DecodingKey, Validation, decode};
 
         let token_data = decode::<Claims>(
             token,
@@ -97,7 +100,12 @@ impl AuthService {
             .ok_or_else(|| DomainError::NotFound("User not found".to_string()))
     }
 
-    pub async fn update_user(&self, token: &str, name: Option<String>, email: Option<String>) -> Result<crate::domain::entities::User, DomainError> {
+    pub async fn update_user(
+        &self,
+        token: &str,
+        name: Option<String>,
+        email: Option<String>,
+    ) -> Result<crate::domain::entities::User, DomainError> {
         let mut user = self.get_current_user(token).await?;
 
         if let Some(n) = name {
@@ -110,7 +118,12 @@ impl AuthService {
         self.user_repository.update(&user).await
     }
 
-    pub async fn change_password(&self, token: &str, current_password: &str, new_password: &str) -> Result<(), DomainError> {
+    pub async fn change_password(
+        &self,
+        token: &str,
+        current_password: &str,
+        new_password: &str,
+    ) -> Result<(), DomainError> {
         let mut user = self.get_current_user(token).await?;
 
         // Verify current password
@@ -124,15 +137,15 @@ impl AuthService {
             .verify_password(password_with_pepper.as_bytes(), &parsed_hash)
             .is_err()
         {
-            return Err(DomainError::ValidationError("Invalid current password".to_string()));
+            return Err(DomainError::ValidationError(
+                "Invalid current password".to_string(),
+            ));
         }
 
-        // Hash new password
-        let salt = argon2::password_hash::SaltString::generate(&mut argon2::password_hash::rand_core::OsRng);
         let new_password_with_pepper = format!("{}{}", new_password, self.pepper);
-        
+
         user.password_hash = argon2
-            .hash_password(new_password_with_pepper.as_bytes(), &salt)
+            .hash_password(new_password_with_pepper.as_bytes())
             .map_err(|e| DomainError::Internal(e.to_string()))?
             .to_string();
 
@@ -152,12 +165,9 @@ mod tests {
 
     fn hash_password(password: &str, pepper: &str) -> String {
         let argon2 = Argon2::default();
-        let salt = argon2::password_hash::SaltString::generate(
-            &mut argon2::password_hash::rand_core::OsRng,
-        );
         let password_peppered = format!("{}{}", password, pepper);
         argon2
-            .hash_password(password_peppered.as_bytes(), &salt)
+            .hash_password(password_peppered.as_bytes())
             .unwrap()
             .to_string()
     }

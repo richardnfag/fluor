@@ -1,6 +1,5 @@
 use actix_cors::Cors;
 use actix_web::{App, HttpServer, web};
-use api::domain::wasm_runtime::WasmRuntime;
 use std::sync::Arc;
 use tracing::{error, info};
 
@@ -74,16 +73,8 @@ async fn main() -> std::io::Result<()> {
         error!("Failed to load routes: {}", e);
     }
 
-    if let Ok(funcs) = function_service.list_functions().await {
-        for f in funcs {
-            if !f.executable.is_empty() {
-                if let Err(e) = runtime.load_function(&f.name, &f.executable) {
-                    error!("Failed to preload function {}: {}", f.name, e);
-                } else {
-                    info!("Preloaded function {}", f.name);
-                }
-            }
-        }
+    if let Err(e) = function_service.preload_existing().await {
+        error!("Failed to schedule function preload: {}", e);
     }
 
     let port = std::env::var("PORT")

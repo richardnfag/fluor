@@ -4,9 +4,7 @@ import {
     LayoutDashboard,
     Code2,
     Zap,
-    Settings,
     User,
-    Workflow,
     LogOut,
     FunctionSquare
 } from 'lucide-react';
@@ -68,7 +66,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                         <span>User Profile</span>
                     </Link>
                     <form action={logoutAction}>
-                        <button className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium border border-transparent text-[var(--accents-5)] hover:glass-glow hover:bg-red-500/10 hover:text-red-500 cursor-pointer transition-colors">
+                        <button type="submit" className="w-full flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium border border-transparent text-[var(--accents-5)] hover:glass-glow hover:bg-red-500/10 hover:text-red-500 cursor-pointer transition-colors">
                             <LogOut size={18} />
                             <span>Log Out</span>
                         </button>

@@ -1,11 +1,13 @@
 use crate::domain::entities::{DomainError, Function};
 use crate::domain::ports::{FunctionRepository, TriggerRepository};
-use crate::domain::wasm_runtime::WasmRuntime;
+use crate::domain::wasm_runtime::{WasmFunctionRequest, WasmInvocation, WasmRuntime};
 use ahash::RandomState;
 use opentelemetry::{KeyValue, global};
 use papaya::HashMap;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::task;
 use tracing::{error, info, instrument, warn};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -94,16 +96,14 @@ impl InvocationService {
         Ok(())
     }
 
-    #[instrument(skip(self, body), fields(function_name, function_status))]
+    #[instrument(skip(self, request), fields(function_name, function_status))]
     pub async fn invoke_http(
         &self,
-        method: &str,
-        path: &str,
-        body: &str,
-    ) -> Result<String, DomainError> {
+        request: WasmFunctionRequest,
+    ) -> Result<WasmInvocation, DomainError> {
         let key = RouteKey {
-            method: HttpMethod::from(method),
-            path: path.to_string(),
+            method: HttpMethod::from(request.method.as_str()),
+            path: request.path.clone(),
         };
 
         let function = { self.routes.pin().get(&key).cloned() };
@@ -114,7 +114,7 @@ impl InvocationService {
             if let Some(rt) = &func.runtime {
                 info!(function_name = func.name, "Function {} started", func.name);
                 let start = Instant::now();
-                let result = rt.invoke(&func.name, body).await;
+                let result = Self::invoke_with_lazy_load(rt.clone(), &func, &request).await;
                 let duration_ms = start.elapsed().as_millis() as u64;
 
                 let meter = global::meter("fluor-api");
@@ -159,6 +159,54 @@ impl InvocationService {
             Err(DomainError::NotFound("Route not found".into()))
         }
     }
+
+    async fn invoke_with_lazy_load(
+        runtime: Arc<dyn WasmRuntime>,
+        function: &Function,
+        request: &WasmFunctionRequest,
+    ) -> anyhow::Result<WasmInvocation> {
+        match runtime.invoke(&function.name, request).await {
+            Ok(result) => Ok(result),
+            Err(first_error)
+                if !function.executable.is_empty()
+                    && first_error
+                        .to_string()
+                        .contains(&format!("Function '{}' not found", function.name)) =>
+            {
+                let precompiled_path = Path::new(&function.executable).with_extension("cwasm");
+
+                if !precompiled_path.exists() {
+                    info!(
+                        function_name = function.name,
+                        precompiled_path = %precompiled_path.display(),
+                        "Function is still warming up; precompiled artifact not ready"
+                    );
+                    return Err(anyhow::anyhow!(
+                        "Function '{}' is warming up; try again shortly",
+                        function.name
+                    ));
+                }
+
+                info!(
+                    function_name = function.name,
+                    precompiled_path = %precompiled_path.display(),
+                    "Function not preloaded yet; loading precompiled artifact on demand"
+                );
+                let runtime_for_load = runtime.clone();
+                let name = function.name.clone();
+                let executable = function.executable.clone();
+
+                task::spawn_blocking(move || runtime_for_load.load_function(&name, &executable))
+                    .await
+                    .map_err(|error| {
+                        anyhow::anyhow!("failed to join lazy load task: {}", error)
+                    })??;
+
+                runtime.invoke(&function.name, request).await
+            }
+            Err(error) => Err(error),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -168,6 +216,7 @@ mod tests {
     use crate::domain::ports::{MockFunctionRepository, MockTriggerRepository};
     use crate::domain::wasm_runtime::MockWasmRuntime;
     use mockall::predicate::*;
+    use tempfile::tempdir;
 
     #[tokio::test]
     async fn test_load_routes_and_invoke() {
@@ -202,8 +251,19 @@ mod tests {
 
         runtime
             .expect_invoke()
-            .with(eq("test-func"), eq("body"))
-            .returning(|_, _| Ok("response".to_string()));
+            .withf(|name, request| {
+                name == "test-func"
+                    && request.method == "POST"
+                    && request.path == "/test"
+                    && request.body == "body"
+            })
+            .returning(|_, _| {
+                Ok(Ok(crate::domain::wasm_runtime::WasmFunctionResponse {
+                    status: 200,
+                    headers: vec![],
+                    body: "response".to_string(),
+                }))
+            });
 
         let service = InvocationService::new(
             Arc::new(trigger_repo),
@@ -216,9 +276,17 @@ mod tests {
         assert!(result.is_ok());
 
         // 2. Invoke
-        let result = service.invoke_http("POST", "/test", "body").await;
+        let result = service
+            .invoke_http(WasmFunctionRequest {
+                method: "POST".to_string(),
+                path: "/test".to_string(),
+                query: None,
+                headers: vec![],
+                body: "body".to_string(),
+            })
+            .await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), "response");
+        assert_eq!(result.unwrap().unwrap().body, "response");
     }
 
     #[tokio::test]
@@ -233,7 +301,167 @@ mod tests {
             Arc::new(runtime),
         );
 
-        let result = service.invoke_http("GET", "/unknown", "").await;
+        let result = service
+            .invoke_http(WasmFunctionRequest {
+                method: "GET".to_string(),
+                path: "/unknown".to_string(),
+                query: None,
+                headers: vec![],
+                body: String::new(),
+            })
+            .await;
         assert!(matches!(result, Err(DomainError::NotFound(_))));
+    }
+
+    #[tokio::test]
+    async fn test_invoke_lazy_loads_when_runtime_is_not_ready() {
+        let mut trigger_repo = MockTriggerRepository::new();
+        let mut function_repo = MockFunctionRepository::new();
+        let mut runtime = MockWasmRuntime::new();
+
+        let trigger = Trigger {
+            name: "lazy-trigger".to_string(),
+            function_name: "lazy-func".to_string(),
+            method: "POST".to_string(),
+            path: "/lazy".to_string(),
+            readonly: false,
+        };
+
+        let temp = tempdir().unwrap();
+        let wasm_path = temp.path().join("lazy.wasm");
+        let cwasm_path = temp.path().join("lazy.cwasm");
+        std::fs::write(&wasm_path, b"wasm").unwrap();
+        std::fs::write(&cwasm_path, b"compiled").unwrap();
+
+        let function = Function {
+            name: "lazy-func".to_string(),
+            executable: wasm_path.display().to_string(),
+            runtime: None,
+            ..Default::default()
+        };
+
+        trigger_repo
+            .expect_find_all()
+            .returning(move || Ok(vec![trigger.clone()]));
+
+        function_repo
+            .expect_find_by_name()
+            .with(eq("lazy-func"))
+            .returning(move |_| Ok(Some(function.clone())));
+
+        {
+            let mut seq = mockall::Sequence::new();
+
+            runtime
+                .expect_invoke()
+                .times(1)
+                .in_sequence(&mut seq)
+                .returning(|name, _| Err(anyhow::anyhow!("Function '{}' not found", name)));
+
+            runtime
+                .expect_load_function()
+                .times(1)
+                .in_sequence(&mut seq)
+                .with(eq("lazy-func"), eq(wasm_path.display().to_string()))
+                .returning(|_, _| Ok(()));
+
+            runtime
+                .expect_invoke()
+                .times(1)
+                .in_sequence(&mut seq)
+                .returning(|_, _| {
+                    Ok(Ok(crate::domain::wasm_runtime::WasmFunctionResponse {
+                        status: 200,
+                        headers: vec![],
+                        body: "lazy-ok".to_string(),
+                    }))
+                });
+        }
+
+        let service = InvocationService::new(
+            Arc::new(trigger_repo),
+            Arc::new(function_repo),
+            Arc::new(runtime),
+        );
+
+        service.load_routes().await.unwrap();
+
+        let result = service
+            .invoke_http(WasmFunctionRequest {
+                method: "POST".to_string(),
+                path: "/lazy".to_string(),
+                query: None,
+                headers: vec![],
+                body: "{}".to_string(),
+            })
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(result.body, "lazy-ok");
+    }
+
+    #[tokio::test]
+    async fn test_invoke_returns_warming_up_when_precompiled_artifact_is_missing() {
+        let mut trigger_repo = MockTriggerRepository::new();
+        let mut function_repo = MockFunctionRepository::new();
+        let mut runtime = MockWasmRuntime::new();
+
+        let temp = tempdir().unwrap();
+        let wasm_path = temp.path().join("warming-up.wasm");
+        std::fs::write(&wasm_path, b"wasm").unwrap();
+
+        let trigger = Trigger {
+            name: "warming-up-trigger".to_string(),
+            function_name: "warming-up-func".to_string(),
+            method: "POST".to_string(),
+            path: "/warming-up".to_string(),
+            readonly: false,
+        };
+
+        let function = Function {
+            name: "warming-up-func".to_string(),
+            executable: wasm_path.display().to_string(),
+            runtime: None,
+            ..Default::default()
+        };
+
+        trigger_repo
+            .expect_find_all()
+            .returning(move || Ok(vec![trigger.clone()]));
+
+        function_repo
+            .expect_find_by_name()
+            .with(eq("warming-up-func"))
+            .returning(move |_| Ok(Some(function.clone())));
+
+        runtime
+            .expect_invoke()
+            .times(1)
+            .returning(|name, _| Err(anyhow::anyhow!("Function '{}' not found", name)));
+
+        runtime.expect_load_function().times(0);
+
+        let service = InvocationService::new(
+            Arc::new(trigger_repo),
+            Arc::new(function_repo),
+            Arc::new(runtime),
+        );
+
+        service.load_routes().await.unwrap();
+
+        let result = service
+            .invoke_http(WasmFunctionRequest {
+                method: "POST".to_string(),
+                path: "/warming-up".to_string(),
+                query: None,
+                headers: vec![],
+                body: "{}".to_string(),
+            })
+            .await;
+
+        assert!(
+            matches!(result, Err(DomainError::Internal(message)) if message.contains("warming up"))
+        );
     }
 }

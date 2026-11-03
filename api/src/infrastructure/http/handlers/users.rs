@@ -1,6 +1,6 @@
 use crate::application::auth_service::AuthService;
 use crate::domain::entities::User;
-use actix_web::{HttpResponse, Responder, get, web, HttpRequest};
+use actix_web::{HttpRequest, HttpResponse, Responder, get, web};
 use serde::Serialize;
 use std::sync::Arc;
 
@@ -24,10 +24,7 @@ impl From<User> for UserResponse {
 }
 
 #[get("/me")]
-pub async fn me(
-    req: HttpRequest,
-    service: web::Data<Arc<AuthService>>,
-) -> impl Responder {
+pub async fn me(req: HttpRequest, service: web::Data<Arc<AuthService>>) -> impl Responder {
     let auth_header = match req.headers().get("Authorization") {
         Some(h) => h,
         None => return HttpResponse::Unauthorized().body("Missing Authorization header"),
@@ -39,7 +36,10 @@ pub async fn me(
     };
 
     // Support "Bearer <token>" or just "<token>"
-    let token = token_str.strip_prefix("Bearer ").unwrap_or(token_str).trim();
+    let token = token_str
+        .strip_prefix("Bearer ")
+        .unwrap_or(token_str)
+        .trim();
 
     match service.get_current_user(token).await {
         Ok(user) => HttpResponse::Ok().json(UserResponse::from(user)),
@@ -69,14 +69,26 @@ pub async fn update_me(
         Err(_) => return HttpResponse::Unauthorized().body("Invalid Authorization header"),
     };
 
-    let token = token_str.strip_prefix("Bearer ").unwrap_or(token_str).trim();
+    let token = token_str
+        .strip_prefix("Bearer ")
+        .unwrap_or(token_str)
+        .trim();
 
-    match service.update_user(token, body.name.clone(), body.email.clone()).await {
+    match service
+        .update_user(token, body.name.clone(), body.email.clone())
+        .await
+    {
         Ok(user) => HttpResponse::Ok().json(UserResponse::from(user)),
         Err(e) => match e {
-            crate::domain::entities::DomainError::NotFound(_) => HttpResponse::NotFound().body(e.to_string()),
-            crate::domain::entities::DomainError::ValidationError(_) => HttpResponse::BadRequest().body(e.to_string()),
-            crate::domain::entities::DomainError::AlreadyExists(_) => HttpResponse::Conflict().body(e.to_string()),
+            crate::domain::entities::DomainError::NotFound(_) => {
+                HttpResponse::NotFound().body(e.to_string())
+            }
+            crate::domain::entities::DomainError::ValidationError(_) => {
+                HttpResponse::BadRequest().body(e.to_string())
+            }
+            crate::domain::entities::DomainError::AlreadyExists(_) => {
+                HttpResponse::Conflict().body(e.to_string())
+            }
             _ => HttpResponse::InternalServerError().body(e.to_string()),
         },
     }
@@ -104,13 +116,23 @@ pub async fn change_password(
         Err(_) => return HttpResponse::Unauthorized().body("Invalid Authorization header"),
     };
 
-    let token = token_str.strip_prefix("Bearer ").unwrap_or(token_str).trim();
+    let token = token_str
+        .strip_prefix("Bearer ")
+        .unwrap_or(token_str)
+        .trim();
 
-    match service.change_password(token, &body.current_password, &body.new_password).await {
+    match service
+        .change_password(token, &body.current_password, &body.new_password)
+        .await
+    {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({ "success": true })),
         Err(e) => match e {
-            crate::domain::entities::DomainError::NotFound(_) => HttpResponse::NotFound().body(e.to_string()),
-            crate::domain::entities::DomainError::ValidationError(_) => HttpResponse::BadRequest().body(e.to_string()),
+            crate::domain::entities::DomainError::NotFound(_) => {
+                HttpResponse::NotFound().body(e.to_string())
+            }
+            crate::domain::entities::DomainError::ValidationError(_) => {
+                HttpResponse::BadRequest().body(e.to_string())
+            }
             _ => HttpResponse::InternalServerError().body(e.to_string()),
         },
     }
